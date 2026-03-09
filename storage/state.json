@@ -1,0 +1,32 @@
+{
+  "ts": "2026-03-09T07:56:27.600389+00:00",
+  "symbol": "BTCUSDT",
+  "book_ready": false,
+  "last_update_id": 10071581299599,
+  "open_interest": 81063.348,
+  "funding_rate": -5.77e-05,
+  "last_signal_ts": null,
+  "last_features": {
+    "ts": "2026-03-09T07:56:27.595002+00:00",
+    "mid_price": 67277.95,
+    "spread": 0.10000000000582077,
+    "imbalance": -0.9744518589132507,
+    "cvd": -61.8990000000001,
+    "delta_15s": 0,
+    "price_change": 0.0,
+    "price_move_ticks": 0.0,
+    "funding_rate": -5.77e-05,
+    "open_interest": 81063.348,
+    "oi_change": -24.51600000000326,
+    "bullish_absorption": false,
+    "bearish_absorption": false,
+    "bullish_divergence": false,
+    "bearish_divergence": false,
+    "bid_spoof_score": 0,
+    "ask_spoof_score": 0,
+    "recent_sell_liq_cluster": false,
+    "recent_buy_liq_cluster": false,
+    "sell_clusters": [],
+    "buy_clusters": []
+  }
+}
