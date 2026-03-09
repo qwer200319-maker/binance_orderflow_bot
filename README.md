@@ -44,6 +44,25 @@ LOG_LEVEL=INFO
 python app.py
 ```
 
+## Deploy on Render (Background Worker)
+This runs the bot as a long-lived background worker.
+
+1. Push this repo to GitHub.
+2. In Render, create a new **Background Worker** and point it at the repo.
+3. Render will detect `render.yaml` and configure the worker.
+4. Set secrets in Render:
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+5. Optional: toggle `TELEGRAM_ENABLED=true`.
+
+Notes:
+- Logs written to `storage/*.jsonl` are ephemeral on Render unless you attach a disk or ship logs elsewhere.
+- To keep raw events, set `BOT_PERSIST_RAW_EVENTS=true` (storage will grow).
+
+Persistent logs on Render:
+- `render.yaml` mounts a disk at `/var/data` and sets `BOT_STORAGE_DIR=/var/data/storage`.
+- Logs will persist across restarts and deploys.
+
 ## Project notes
 - The book sync follows Binance futures guidance: buffer diff-depth events, fetch snapshot, then apply updates only when sequence rules are satisfied.
 - Spoofing and absorption logic are heuristic, not ground-truth market intent.

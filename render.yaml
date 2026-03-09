@@ -1,0 +1,28 @@
+services:
+  - type: worker
+    name: binance-orderflow-bot
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    disk:
+      name: bot-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: BOT_SYMBOL
+        value: btcusdt
+      - key: BOT_MARKET_SYMBOL
+        value: BTCUSDT
+      - key: BOT_STORAGE_DIR
+        value: /var/data/storage
+      - key: TELEGRAM_ENABLED
+        value: "false"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: BOT_PERSIST_RAW_EVENTS
+        value: "false"

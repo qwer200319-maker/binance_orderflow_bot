@@ -44,7 +44,12 @@ class BotApp:
         self.trades_buffer = TradesBuffer(max_age_seconds=900)
         self.cvd = CVDTracker()
         self.liquidations = LiquidationMap(max_age_seconds=900)
-        self.ws_manager = WebSocketManager(settings.ws_base_url, settings.streams, settings.log_level)
+        self.ws_manager = WebSocketManager(
+            settings.ws_base_url,
+            settings.streams,
+            settings.log_level,
+            settings.reconnect_delay_seconds,
+        )
         self.telegram = TelegramNotifier(
             settings.telegram_bot_token,
             settings.telegram_chat_id,
@@ -64,15 +69,28 @@ class BotApp:
         self.running = True
 
     async def initialize(self, session: aiohttp.ClientSession) -> None:
-        await self.refresh_snapshot(session)
+        while self.running:
+            ok = await self.refresh_snapshot(session)
+            if ok:
+                break
+            await asyncio.sleep(settings.reconnect_delay_seconds)
         await self.refresh_oi(session)
         await self.refresh_funding(session)
         self.persist_state()
 
-    async def refresh_snapshot(self, session: aiohttp.ClientSession) -> None:
-        snapshot = await fetch_depth_snapshot(
-            session, settings.rest_base_url, settings.market_symbol, settings.depth_limit
-        )
+    async def refresh_snapshot(self, session: aiohttp.ClientSession) -> bool:
+        try:
+            snapshot = await fetch_depth_snapshot(
+                session, settings.rest_base_url, settings.market_symbol, settings.depth_limit
+            )
+        except aiohttp.ClientResponseError as exc:
+            if exc.status == 451:
+                self.logger.error(
+                    "Snapshot blocked (HTTP 451). This usually means the Binance API is blocked from your hosting "
+                    "region. Change Render region or use a proxy via BINANCE_REST_BASE_URL."
+                )
+                return False
+            raise
         self.book_sync.initialize_from_snapshot(snapshot)
         self.last_snapshot_ts = now_ts()
         self.logger.info(
@@ -80,16 +98,35 @@ class BotApp:
             snapshot.get("lastUpdateId"),
             self.book_sync.is_ready,
         )
+        return True
 
-    async def refresh_oi(self, session: aiohttp.ClientSession) -> None:
-        oi = await fetch_open_interest(session, settings.rest_base_url, settings.market_symbol)
+    async def refresh_oi(self, session: aiohttp.ClientSession) -> bool:
+        try:
+            oi = await fetch_open_interest(session, settings.rest_base_url, settings.market_symbol)
+        except aiohttp.ClientResponseError as exc:
+            if exc.status == 451:
+                self.logger.error(
+                    "Open interest blocked (HTTP 451). Change Render region or use a proxy."
+                )
+                return False
+            raise
         self.previous_open_interest = self.current_open_interest or oi
         self.current_open_interest = oi
+        return True
 
-    async def refresh_funding(self, session: aiohttp.ClientSession) -> None:
-        self.current_funding_rate = await fetch_funding_rate(
-            session, settings.rest_base_url, settings.market_symbol
-        )
+    async def refresh_funding(self, session: aiohttp.ClientSession) -> bool:
+        try:
+            self.current_funding_rate = await fetch_funding_rate(
+                session, settings.rest_base_url, settings.market_symbol
+            )
+        except aiohttp.ClientResponseError as exc:
+            if exc.status == 451:
+                self.logger.error(
+                    "Funding rate blocked (HTTP 451). Change Render region or use a proxy."
+                )
+                return False
+            raise
+        return True
 
     async def periodic_rest_tasks(self, session: aiohttp.ClientSession) -> None:
         last_oi_refresh = 0.0
@@ -98,11 +135,11 @@ class BotApp:
             now = now_ts()
             try:
                 if now - last_oi_refresh >= settings.oi_poll_seconds:
-                    await self.refresh_oi(session)
-                    last_oi_refresh = now
+                    if await self.refresh_oi(session):
+                        last_oi_refresh = now
                 if now - last_funding_refresh >= settings.funding_poll_seconds:
-                    await self.refresh_funding(session)
-                    last_funding_refresh = now
+                    if await self.refresh_funding(session):
+                        last_funding_refresh = now
                 if now - self.last_snapshot_ts >= settings.snapshot_refresh_seconds:
                     await self.refresh_snapshot(session)
             except Exception as exc:  # noqa: BLE001

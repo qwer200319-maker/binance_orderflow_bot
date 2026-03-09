@@ -7,7 +7,7 @@ from typing import List
 
 
 BASE_DIR = Path(__file__).resolve().parent
-STORAGE_DIR = BASE_DIR / "storage"
+STORAGE_DIR = Path(os.getenv("BOT_STORAGE_DIR", str(BASE_DIR / "storage")))
 RAW_EVENTS_DIR = STORAGE_DIR / "raw_events"
 
 
