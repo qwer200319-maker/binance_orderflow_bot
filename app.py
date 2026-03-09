@@ -94,9 +94,10 @@ class BotApp:
         self.book_sync.initialize_from_snapshot(snapshot)
         self.last_snapshot_ts = now_ts()
         self.logger.info(
-            "Loaded snapshot lastUpdateId=%s ready=%s",
+            "Loaded snapshot lastUpdateId=%s ready=%s %s",
             snapshot.get("lastUpdateId"),
             self.book_sync.is_ready,
+            self.book_sync.buffer_summary(),
         )
         return True
 
@@ -173,8 +174,14 @@ class BotApp:
 
         ok = self.book_sync.process_event(event)
         if not ok:
-            self.logger.warning("Order book out of sync. Reinitializing...")
-            await self.refresh_snapshot(session)
+            if self.book_sync.needs_snapshot_refresh():
+                now = now_ts()
+                if now - self.last_snapshot_ts >= 5:
+                    self.logger.warning(
+                        "Order book snapshot is behind buffered events. Refreshing snapshot... %s",
+                        self.book_sync.buffer_summary(),
+                    )
+                    await self.refresh_snapshot(session)
             return
 
         book_snapshot = build_book_snapshot(self.book)

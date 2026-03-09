@@ -13,6 +13,7 @@ class BookSynchronizer:
         self.buffer: Deque[dict] = deque()
         self.is_ready: bool = False
         self.last_u: int | None = None
+        self.snapshot_last_update_id: int | None = None
         self.logger = get_logger(self.__class__.__name__, log_level)
 
     def reset(self) -> None:
@@ -24,6 +25,7 @@ class BookSynchronizer:
         self.buffer.clear()
         self.is_ready = False
         self.last_u = None
+        self.snapshot_last_update_id = None
         self.book.clear()
 
     def buffer_event(self, event: dict) -> None:
@@ -36,22 +38,72 @@ class BookSynchronizer:
             len(self.buffer),
         )
 
+    def buffer_age_seconds(self) -> float:
+        if not self.buffer:
+            return 0.0
+        first = self.buffer[0]
+        last = self.buffer[-1]
+        try:
+            return max((float(last.get("event_time", 0)) - float(first.get("event_time", 0))) / 1000.0, 0.0)
+        except Exception:  # noqa: BLE001
+            return 0.0
+
+    def buffer_summary(self) -> str:
+        if not self.buffer:
+            return "buffer=0"
+        first = self.buffer[0]
+        last = self.buffer[-1]
+        return (
+            f"buffer={len(self.buffer)} "
+            f"U0={first.get('U')} u0={first.get('u')} "
+            f"U1={last.get('U')} u1={last.get('u')} "
+            f"age={self.buffer_age_seconds():.3f}s"
+        )
+
     def initialize_from_snapshot(self, snapshot: dict) -> None:
         self.book.load_snapshot(snapshot)
-        last_update_id = int(snapshot["lastUpdateId"])
-        buffer_before = len(self.buffer)
+        self.snapshot_last_update_id = int(snapshot["lastUpdateId"])
+        self._finalize_from_buffer(snapshot_init=True)
 
+    def try_finalize(self) -> bool:
+        if self.snapshot_last_update_id is None:
+            return False
+        return self._finalize_from_buffer(snapshot_init=False)
+
+    def needs_snapshot_refresh(self) -> bool:
+        if self.snapshot_last_update_id is None or not self.buffer:
+            return False
+        first_u = int(self.buffer[0].get("U", 0))
+        return first_u > (self.snapshot_last_update_id + 1)
+
+    def process_event(self, event: dict) -> bool:
+        if not self.is_ready:
+            self.buffer_event(event)
+            if self.try_finalize():
+                return True
+            return False
+        return self._process_ready_event(event)
+
+    def _finalize_from_buffer(self, snapshot_init: bool) -> bool:
+        last_update_id = self.snapshot_last_update_id
+        if last_update_id is None:
+            return False
+
+        buffer_before = len(self.buffer)
         trimmed = 0
-        while self.buffer and int(self.buffer[0]["u"]) < last_update_id:
+        while self.buffer and int(self.buffer[0]["u"]) <= last_update_id:
             self.buffer.popleft()
             trimmed += 1
-        self.logger.debug(
-            "Snapshot init lastUpdateId=%s buffer_before=%s trimmed=%s buffer_after=%s",
-            last_update_id,
-            buffer_before,
-            trimmed,
-            len(self.buffer),
-        )
+
+        if snapshot_init or trimmed or buffer_before:
+            self.logger.debug(
+                "Snapshot init lastUpdateId=%s buffer_before=%s trimmed=%s buffer_after=%s %s",
+                last_update_id,
+                buffer_before,
+                trimmed,
+                len(self.buffer),
+                self.buffer_summary(),
+            )
 
         first_match_found = False
         remaining: List[dict] = []
@@ -59,7 +111,7 @@ class BookSynchronizer:
             u = int(event["u"])
             U = int(event["U"])
             if not first_match_found:
-                if U <= last_update_id <= u:
+                if U <= last_update_id + 1 <= u:
                     self._apply_event(event)
                     first_match_found = True
                 else:
@@ -74,12 +126,13 @@ class BookSynchronizer:
 
         if not first_match_found:
             self.logger.warning(
-                "No matching buffered event found for snapshot lastUpdateId=%s buffer_after=%s",
+                "No matching buffered event found for snapshot lastUpdateId=%s buffer_after=%s %s",
                 last_update_id,
                 len(self.buffer),
+                self.buffer_summary(),
             )
             self.is_ready = False
-            return
+            return False
 
         for event in remaining:
             if not self._process_ready_event(event):
@@ -89,7 +142,7 @@ class BookSynchronizer:
                     event.get("u"),
                     event.get("pu"),
                 )
-                return
+                return False
 
         self.buffer.clear()
         self.is_ready = True
@@ -98,12 +151,7 @@ class BookSynchronizer:
             self.last_u,
             len(remaining),
         )
-
-    def process_event(self, event: dict) -> bool:
-        if not self.is_ready:
-            self.buffer_event(event)
-            return False
-        return self._process_ready_event(event)
+        return True
 
     def _process_ready_event(self, event: dict) -> bool:
         if self.last_u is not None and int(event.get("pu", -1)) != self.last_u:
