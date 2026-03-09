@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+import time
 from typing import Deque, List
 
 from orderbook.local_book import LocalBook
@@ -15,6 +16,8 @@ class BookSynchronizer:
         self.last_u: int | None = None
         self.snapshot_last_update_id: int | None = None
         self.logger = get_logger(self.__class__.__name__, log_level)
+        self._last_buffer_log_ts: float | None = None
+        self._buffer_log_interval_sec: float = 5.0
 
     def reset(self) -> None:
         self.logger.warning(
@@ -30,13 +33,7 @@ class BookSynchronizer:
 
     def buffer_event(self, event: dict) -> None:
         self.buffer.append(event)
-        self.logger.debug(
-            "Buffered depth event U=%s u=%s pu=%s buffer=%s",
-            event.get("U"),
-            event.get("u"),
-            event.get("pu"),
-            len(self.buffer),
-        )
+        self._maybe_log_buffer(event)
 
     def buffer_age_seconds(self) -> float:
         if not self.buffer:
@@ -60,6 +57,20 @@ class BookSynchronizer:
             f"age={self.buffer_age_seconds():.3f}s"
         )
 
+    def _maybe_log_buffer(self, event: dict) -> None:
+        if not self.logger.isEnabledFor(10):
+            return
+        now = time.time()
+        if self._last_buffer_log_ts is not None and now - self._last_buffer_log_ts < self._buffer_log_interval_sec:
+            return
+        self._last_buffer_log_ts = now
+        self.logger.debug(
+            "Buffered depth event U=%s u=%s pu=%s %s",
+            event.get("U"),
+            event.get("u"),
+            event.get("pu"),
+            self.buffer_summary(),
+        )
     def initialize_from_snapshot(self, snapshot: dict) -> None:
         self.book.load_snapshot(snapshot)
         self.snapshot_last_update_id = int(snapshot["lastUpdateId"])
