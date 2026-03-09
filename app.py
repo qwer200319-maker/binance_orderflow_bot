@@ -39,7 +39,7 @@ class BotApp:
     def __init__(self) -> None:
         self.logger = get_logger("BotApp", settings.log_level)
         self.book = LocalBook()
-        self.book_sync = BookSynchronizer(self.book)
+        self.book_sync = BookSynchronizer(self.book, settings.log_level)
         self.wall_tracker = WallTracker()
         self.trades_buffer = TradesBuffer(max_age_seconds=900)
         self.cvd = CVDTracker()
