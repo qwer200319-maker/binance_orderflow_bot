@@ -118,6 +118,17 @@ class BotApp:
                 )
                 return False
             raise
+        except (asyncio.TimeoutError, aiohttp.ClientError) as exc:
+            self.logger.warning(
+                "Snapshot request failed (%s). Backing off for %ss.",
+                exc.__class__.__name__,
+                self.snapshot_backoff_seconds,
+            )
+            self.snapshot_backoff_until = now_ts() + self.snapshot_backoff_seconds
+            self.snapshot_backoff_seconds = min(
+                self.snapshot_backoff_seconds * 2, settings.rest_backoff_max_seconds
+            )
+            return False
         self.book_sync.initialize_from_snapshot(snapshot)
         self.last_snapshot_ts = now_ts()
         self.snapshot_backoff_seconds = settings.rest_backoff_seconds
@@ -154,6 +165,17 @@ class BotApp:
                 )
                 return False
             raise
+        except (asyncio.TimeoutError, aiohttp.ClientError) as exc:
+            self.logger.warning(
+                "Open interest request failed (%s). Backing off for %ss.",
+                exc.__class__.__name__,
+                self.oi_backoff_seconds,
+            )
+            self.oi_backoff_until = now_ts() + self.oi_backoff_seconds
+            self.oi_backoff_seconds = min(
+                self.oi_backoff_seconds * 2, settings.rest_backoff_max_seconds
+            )
+            return False
         self.previous_open_interest = self.current_open_interest or oi
         self.current_open_interest = oi
         self.oi_backoff_seconds = settings.rest_backoff_seconds
@@ -186,6 +208,17 @@ class BotApp:
                 )
                 return False
             raise
+        except (asyncio.TimeoutError, aiohttp.ClientError) as exc:
+            self.logger.warning(
+                "Funding request failed (%s). Backing off for %ss.",
+                exc.__class__.__name__,
+                self.funding_backoff_seconds,
+            )
+            self.funding_backoff_until = now_ts() + self.funding_backoff_seconds
+            self.funding_backoff_seconds = min(
+                self.funding_backoff_seconds * 2, settings.rest_backoff_max_seconds
+            )
+            return False
         self.funding_backoff_seconds = settings.rest_backoff_seconds
         return True
 
