@@ -57,6 +57,9 @@ class BookSynchronizer:
             f"age={self.buffer_age_seconds():.3f}s"
         )
 
+    def buffer_len(self) -> int:
+        return len(self.buffer)
+
     def _maybe_log_buffer(self, event: dict) -> None:
         if not self.logger.isEnabledFor(10):
             return

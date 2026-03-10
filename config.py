@@ -29,6 +29,9 @@ class Settings:
     snapshot_refresh_seconds: int = int(os.getenv("BOT_SNAPSHOT_REFRESH_SECONDS", "1800"))
     ping_interval_seconds: int = int(os.getenv("BOT_PING_INTERVAL_SECONDS", "20"))
     reconnect_delay_seconds: int = int(os.getenv("BOT_RECONNECT_DELAY_SECONDS", "5"))
+    rest_backoff_seconds: int = int(os.getenv("BOT_REST_BACKOFF_SECONDS", "30"))
+    rest_backoff_max_seconds: int = int(os.getenv("BOT_REST_BACKOFF_MAX_SECONDS", "300"))
+    depth_buffer_max: int = int(os.getenv("BOT_DEPTH_BUFFER_MAX", "2000"))
 
     streams: List[str] = field(default_factory=list)
 

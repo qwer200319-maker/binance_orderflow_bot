@@ -67,6 +67,12 @@ class BotApp:
         self.last_signal_ts: float | None = None
         self.last_feature_payload: Dict[str, Any] = {}
         self.running = True
+        self.oi_backoff_until: float = 0.0
+        self.funding_backoff_until: float = 0.0
+        self.snapshot_backoff_until: float = 0.0
+        self.oi_backoff_seconds: int = settings.rest_backoff_seconds
+        self.funding_backoff_seconds: int = settings.rest_backoff_seconds
+        self.snapshot_backoff_seconds: int = settings.rest_backoff_seconds
 
     async def initialize(self, session: aiohttp.ClientSession) -> None:
         while self.running:
@@ -89,10 +95,26 @@ class BotApp:
                     "Snapshot blocked (HTTP 451). This usually means the Binance API is blocked from your hosting "
                     "region. Change Render region or use a proxy via BINANCE_REST_BASE_URL."
                 )
+                self.snapshot_backoff_until = now_ts() + self.snapshot_backoff_seconds
+                self.snapshot_backoff_seconds = min(
+                    self.snapshot_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
+            if exc.status == 429:
+                retry_after = self._retry_after_seconds(exc, self.snapshot_backoff_seconds)
+                self.logger.warning(
+                    "Snapshot rate limited (HTTP 429). Backing off for %ss.",
+                    retry_after,
+                )
+                self.snapshot_backoff_until = now_ts() + retry_after
+                self.snapshot_backoff_seconds = min(
+                    self.snapshot_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
                 return False
             raise
         self.book_sync.initialize_from_snapshot(snapshot)
         self.last_snapshot_ts = now_ts()
+        self.snapshot_backoff_seconds = settings.rest_backoff_seconds
         self.logger.info(
             "Loaded snapshot lastUpdateId=%s ready=%s %s",
             snapshot.get("lastUpdateId"),
@@ -109,10 +131,26 @@ class BotApp:
                 self.logger.error(
                     "Open interest blocked (HTTP 451). Change Render region or use a proxy."
                 )
+                self.oi_backoff_until = now_ts() + self.oi_backoff_seconds
+                self.oi_backoff_seconds = min(
+                    self.oi_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
+            if exc.status == 429:
+                retry_after = self._retry_after_seconds(exc, self.oi_backoff_seconds)
+                self.logger.warning(
+                    "Open interest rate limited (HTTP 429). Backing off for %ss.",
+                    retry_after,
+                )
+                self.oi_backoff_until = now_ts() + retry_after
+                self.oi_backoff_seconds = min(
+                    self.oi_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
                 return False
             raise
         self.previous_open_interest = self.current_open_interest or oi
         self.current_open_interest = oi
+        self.oi_backoff_seconds = settings.rest_backoff_seconds
         return True
 
     async def refresh_funding(self, session: aiohttp.ClientSession) -> bool:
@@ -125,8 +163,24 @@ class BotApp:
                 self.logger.error(
                     "Funding rate blocked (HTTP 451). Change Render region or use a proxy."
                 )
+                self.funding_backoff_until = now_ts() + self.funding_backoff_seconds
+                self.funding_backoff_seconds = min(
+                    self.funding_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
+            if exc.status == 429:
+                retry_after = self._retry_after_seconds(exc, self.funding_backoff_seconds)
+                self.logger.warning(
+                    "Funding rate rate limited (HTTP 429). Backing off for %ss.",
+                    retry_after,
+                )
+                self.funding_backoff_until = now_ts() + retry_after
+                self.funding_backoff_seconds = min(
+                    self.funding_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
                 return False
             raise
+        self.funding_backoff_seconds = settings.rest_backoff_seconds
         return True
 
     async def periodic_rest_tasks(self, session: aiohttp.ClientSession) -> None:
@@ -135,13 +189,13 @@ class BotApp:
         while self.running:
             now = now_ts()
             try:
-                if now - last_oi_refresh >= settings.oi_poll_seconds:
+                if now >= self.oi_backoff_until and now - last_oi_refresh >= settings.oi_poll_seconds:
                     if await self.refresh_oi(session):
                         last_oi_refresh = now
-                if now - last_funding_refresh >= settings.funding_poll_seconds:
+                if now >= self.funding_backoff_until and now - last_funding_refresh >= settings.funding_poll_seconds:
                     if await self.refresh_funding(session):
                         last_funding_refresh = now
-                if now - self.last_snapshot_ts >= settings.snapshot_refresh_seconds:
+                if now >= self.snapshot_backoff_until and now - self.last_snapshot_ts >= settings.snapshot_refresh_seconds:
                     await self.refresh_snapshot(session)
             except Exception as exc:  # noqa: BLE001
                 self.logger.exception("REST task error: %s", exc)
@@ -163,25 +217,34 @@ class BotApp:
                 self.handle_liquidation_event(parse_force_order_message(data))
 
     async def handle_depth_event(self, event: dict, session: aiohttp.ClientSession) -> None:
-        if not self.book_sync.is_ready:
-            self.book_sync.buffer_event(event)
-            if self.book.last_update_id is None:
-                try:
-                    await self.refresh_snapshot(session)
-                except Exception as exc:  # noqa: BLE001
-                    self.logger.exception("Snapshot refresh failed during bootstrap: %s", exc)
-            return
-
         ok = self.book_sync.process_event(event)
         if not ok:
-            if self.book_sync.needs_snapshot_refresh():
-                now = now_ts()
-                if now - self.last_snapshot_ts >= 5:
+            if not self.book_sync.is_ready:
+                if self.book_sync.buffer_len() > settings.depth_buffer_max:
                     self.logger.warning(
-                        "Order book snapshot is behind buffered events. Refreshing snapshot... %s",
+                        "Depth buffer overflow. Resetting sync... %s",
                         self.book_sync.buffer_summary(),
                     )
+                    self.book_sync.reset()
                     await self.refresh_snapshot(session)
+                    return
+                if self.book.last_update_id is None:
+                    try:
+                        await self.refresh_snapshot(session)
+                    except Exception as exc:  # noqa: BLE001
+                        self.logger.exception("Snapshot refresh failed during bootstrap: %s", exc)
+                    return
+                if self.book_sync.needs_snapshot_refresh():
+                    now = now_ts()
+                    if now - self.last_snapshot_ts >= 5:
+                        self.logger.warning(
+                            "Order book snapshot is behind buffered events. Refreshing snapshot... %s",
+                            self.book_sync.buffer_summary(),
+                        )
+                        await self.refresh_snapshot(session)
+                    return
+            self.logger.warning("Order book out of sync. Reinitializing...")
+            await self.refresh_snapshot(session)
             return
 
         book_snapshot = build_book_snapshot(self.book)
@@ -194,6 +257,15 @@ class BotApp:
             self.book.best_bid(),
             self.book.best_ask(),
         )
+
+    @staticmethod
+    def _retry_after_seconds(exc: aiohttp.ClientResponseError, fallback: int) -> int:
+        try:
+            if exc.headers and "Retry-After" in exc.headers:
+                return int(exc.headers["Retry-After"])
+        except Exception:  # noqa: BLE001
+            return fallback
+        return fallback
         self.wall_tracker.observe(
             "ask",
             ask_walls,
