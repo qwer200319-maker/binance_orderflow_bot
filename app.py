@@ -39,7 +39,12 @@ class BotApp:
     def __init__(self) -> None:
         self.logger = get_logger("BotApp", settings.log_level)
         self.book = LocalBook()
-        self.book_sync = BookSynchronizer(self.book, settings.log_level)
+        self.book_sync = BookSynchronizer(
+            self.book,
+            settings.log_level,
+            settings.buffer_log_interval_seconds,
+            settings.no_match_warn_throttle_seconds,
+        )
         self.wall_tracker = WallTracker()
         self.trades_buffer = TradesBuffer(max_age_seconds=900)
         self.cvd = CVDTracker()
@@ -73,6 +78,7 @@ class BotApp:
         self.oi_backoff_seconds: int = settings.rest_backoff_seconds
         self.funding_backoff_seconds: int = settings.rest_backoff_seconds
         self.snapshot_backoff_seconds: int = settings.rest_backoff_seconds
+        self.last_snapshot_warn_ts: float = 0.0
 
     async def initialize(self, session: aiohttp.ClientSession) -> None:
         while self.running:
@@ -237,10 +243,12 @@ class BotApp:
                 if self.book_sync.needs_snapshot_refresh():
                     now = now_ts()
                     if now - self.last_snapshot_ts >= 5:
-                        self.logger.warning(
-                            "Order book snapshot is behind buffered events. Refreshing snapshot... %s",
-                            self.book_sync.buffer_summary(),
-                        )
+                        if now - self.last_snapshot_warn_ts >= settings.log_throttle_seconds:
+                            self.last_snapshot_warn_ts = now
+                            self.logger.warning(
+                                "Order book snapshot is behind buffered events. Refreshing snapshot... %s",
+                                self.book_sync.buffer_summary(),
+                            )
                         await self.refresh_snapshot(session)
                     return
             self.logger.warning("Order book out of sync. Reinitializing...")

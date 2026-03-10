@@ -23,6 +23,12 @@ services:
       - key: TELEGRAM_CHAT_ID
         sync: false
       - key: LOG_LEVEL
-        value: INFO
+        value: DEBUG
+      - key: BOT_LOG_THROTTLE_SECONDS
+        value: "0"
+      - key: BOT_BUFFER_LOG_INTERVAL_SECONDS
+        value: "0"
+      - key: BOT_NO_MATCH_WARN_THROTTLE_SECONDS
+        value: "0"
       - key: BOT_PERSIST_RAW_EVENTS
         value: "false"

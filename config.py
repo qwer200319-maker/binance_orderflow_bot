@@ -72,6 +72,9 @@ class Settings:
 
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     persist_raw_events: bool = os.getenv("BOT_PERSIST_RAW_EVENTS", "false").lower() == "true"
+    log_throttle_seconds: int = int(os.getenv("BOT_LOG_THROTTLE_SECONDS", "30"))
+    buffer_log_interval_seconds: float = float(os.getenv("BOT_BUFFER_LOG_INTERVAL_SECONDS", "5"))
+    no_match_warn_throttle_seconds: float = float(os.getenv("BOT_NO_MATCH_WARN_THROTTLE_SECONDS", "30"))
 
     def __post_init__(self) -> None:
         if not self.streams:

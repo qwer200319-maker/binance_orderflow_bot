@@ -9,7 +9,13 @@ from utils.logger import get_logger
 
 
 class BookSynchronizer:
-    def __init__(self, book: LocalBook, log_level: str = "INFO") -> None:
+    def __init__(
+        self,
+        book: LocalBook,
+        log_level: str = "INFO",
+        buffer_log_interval_sec: float = 5.0,
+        no_match_warn_interval_sec: float = 30.0,
+    ) -> None:
         self.book = book
         self.buffer: Deque[dict] = deque()
         self.is_ready: bool = False
@@ -17,7 +23,9 @@ class BookSynchronizer:
         self.snapshot_last_update_id: int | None = None
         self.logger = get_logger(self.__class__.__name__, log_level)
         self._last_buffer_log_ts: float | None = None
-        self._buffer_log_interval_sec: float = 5.0
+        self._buffer_log_interval_sec: float = buffer_log_interval_sec
+        self._last_no_match_warn_ts: float | None = None
+        self._no_match_warn_interval_sec: float = no_match_warn_interval_sec
 
     def reset(self) -> None:
         self.logger.warning(
@@ -62,6 +70,15 @@ class BookSynchronizer:
 
     def _maybe_log_buffer(self, event: dict) -> None:
         if not self.logger.isEnabledFor(10):
+            return
+        if self._buffer_log_interval_sec <= 0:
+            self.logger.debug(
+                "Buffered depth event U=%s u=%s pu=%s %s",
+                event.get("U"),
+                event.get("u"),
+                event.get("pu"),
+                self.buffer_summary(),
+            )
             return
         now = time.time()
         if self._last_buffer_log_ts is not None and now - self._last_buffer_log_ts < self._buffer_log_interval_sec:
@@ -139,12 +156,43 @@ class BookSynchronizer:
             remaining.append(event)
 
         if not first_match_found:
-            self.logger.warning(
-                "No matching buffered event found for snapshot lastUpdateId=%s buffer_after=%s %s",
-                last_update_id,
-                len(self.buffer),
-                self.buffer_summary(),
-            )
+            if not self.buffer:
+                self.logger.debug(
+                    "No buffered events yet for snapshot lastUpdateId=%s",
+                    last_update_id,
+                )
+            else:
+                now = time.time()
+                if self._no_match_warn_interval_sec <= 0:
+                    first = self.buffer[0]
+                    self.logger.warning(
+                        "No matching buffered event found for snapshot lastUpdateId=%s buffer_after=%s U0=%s u0=%s",
+                        last_update_id,
+                        len(self.buffer),
+                        first.get("U"),
+                        first.get("u"),
+                    )
+                    self.is_ready = False
+                    return False
+                if (
+                    self._last_no_match_warn_ts is None
+                    or now - self._last_no_match_warn_ts >= self._no_match_warn_interval_sec
+                ):
+                    self._last_no_match_warn_ts = now
+                    first = self.buffer[0]
+                    self.logger.warning(
+                        "No matching buffered event found for snapshot lastUpdateId=%s buffer_after=%s U0=%s u0=%s",
+                        last_update_id,
+                        len(self.buffer),
+                        first.get("U"),
+                        first.get("u"),
+                    )
+                else:
+                    self.logger.debug(
+                        "No matching buffered event (throttled) lastUpdateId=%s %s",
+                        last_update_id,
+                        self.buffer_summary(),
+                    )
             self.is_ready = False
             return False
 
