@@ -59,6 +59,7 @@ class Settings:
     long_signal_score: int = int(os.getenv("BOT_LONG_SIGNAL_SCORE", "6"))
     short_signal_score: int = int(os.getenv("BOT_SHORT_SIGNAL_SCORE", "6"))
     min_signal_cooldown_seconds: int = int(os.getenv("BOT_SIGNAL_COOLDOWN_SECONDS", "90"))
+    min_repeat_price_change: float = float(os.getenv("BOT_MIN_REPEAT_PRICE_CHANGE", "0"))
 
     atr_length: int = int(os.getenv("BOT_ATR_LENGTH", "14"))
     sl_atr_multiplier: float = float(os.getenv("BOT_SL_ATR_MULTIPLIER", "1.2"))

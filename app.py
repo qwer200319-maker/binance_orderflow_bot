@@ -70,6 +70,10 @@ class BotApp:
         self.current_funding_rate: float = 0.0
         self.last_snapshot_ts: float = 0.0
         self.last_signal_ts: float | None = None
+        self.last_signal_side: str | None = None
+        self.last_signal_price: float | None = None
+        self.last_signal_long_score: int | None = None
+        self.last_signal_short_score: int | None = None
         self.last_feature_payload: Dict[str, Any] = {}
         self.running = True
         self.oi_backoff_until: float = 0.0
@@ -423,6 +427,9 @@ class BotApp:
                 if signal and current_price > 0 and signal_allowed(
                     self.last_signal_ts, now, settings.min_signal_cooldown_seconds
                 ):
+                    if not self._repeat_signal_allowed(signal, current_price, long_score, short_score):
+                        await asyncio.sleep(settings.feature_interval_seconds)
+                        continue
                     plan = build_trade_plan(signal, current_price, self.compute_micro_atr())
                     message = format_signal(
                         settings.market_symbol,
@@ -446,6 +453,10 @@ class BotApp:
                     }
                     self.signal_store.append(signal_payload)
                     self.last_signal_ts = now
+                    self.last_signal_side = signal
+                    self.last_signal_price = current_price
+                    self.last_signal_long_score = long_score
+                    self.last_signal_short_score = short_score
                     self.logger.info("Signal emitted: %s", signal_payload)
                 self.persist_state()
             except Exception as exc:  # noqa: BLE001
@@ -466,9 +477,28 @@ class BotApp:
             "open_interest": self.current_open_interest,
             "funding_rate": self.current_funding_rate,
             "last_signal_ts": self.last_signal_ts,
+            "last_signal_side": self.last_signal_side,
+            "last_signal_price": self.last_signal_price,
+            "last_signal_long_score": self.last_signal_long_score,
+            "last_signal_short_score": self.last_signal_short_score,
             "last_features": self.last_feature_payload,
         }
         self.state_store.save(payload)
+
+    def _repeat_signal_allowed(self, side: str, price: float, long_score: int, short_score: int) -> bool:
+        if self.last_signal_side is None or self.last_signal_price is None:
+            return True
+        if side != self.last_signal_side:
+            return True
+
+        price_change = abs(price - self.last_signal_price)
+        min_change = settings.min_repeat_price_change
+        if min_change > 0 and price_change >= min_change:
+            return True
+
+        if side == "LONG":
+            return self.last_signal_long_score is None or long_score > self.last_signal_long_score
+        return self.last_signal_short_score is None or short_score > self.last_signal_short_score
 
 
 async def main() -> None:

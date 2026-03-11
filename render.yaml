@@ -22,6 +22,10 @@ services:
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      - key: BOT_SIGNAL_COOLDOWN_SECONDS
+        value: "900"
+      - key: BOT_MIN_REPEAT_PRICE_CHANGE
+        value: "0"
       - key: LOG_LEVEL
         value: DEBUG
       - key: BOT_LOG_THROTTLE_SECONDS
