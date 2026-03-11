@@ -65,6 +65,9 @@ class Settings:
     tp1_rr: float = float(os.getenv("BOT_TP1_RR", "1.5"))
     tp2_rr: float = float(os.getenv("BOT_TP2_RR", "2.5"))
     default_tick_size: float = float(os.getenv("BOT_DEFAULT_TICK_SIZE", "0.1"))
+    sl_usd: float = float(os.getenv("BOT_SL_USD", "500"))
+    tp1_usd: float = float(os.getenv("BOT_TP1_USD", "1500"))
+    tp2_usd: float = float(os.getenv("BOT_TP2_USD", "2000"))
 
     telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
