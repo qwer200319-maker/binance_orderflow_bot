@@ -19,3 +19,4 @@ def trend_continuation_block(side: str, features: dict) -> bool:
         and features.get("delta_expanding_down", False)
         and features.get("active_sell_liq_cluster", False)
     )
+

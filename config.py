@@ -36,6 +36,18 @@ class Settings:
     setup_zone_buffer_mult: float = float(os.getenv("BOT_SETUP_ZONE_BUFFER_MULT", "0.35"))
     sweep_lookback_candles: int = int(os.getenv("BOT_SWEEP_LOOKBACK_CANDLES", "2"))
     vwap_lookback_candles: int = int(os.getenv("BOT_VWAP_LOOKBACK_CANDLES", "96"))
+    regime_lookback_candles: int = int(os.getenv("BOT_REGIME_LOOKBACK_CANDLES", "48"))
+    regime_expansion_ratio: float = float(os.getenv("BOT_REGIME_EXPANSION_RATIO", "1.6"))
+    regime_chop_crosses: int = int(os.getenv("BOT_REGIME_CHOP_CROSSES", "6"))
+    regime_range_ratio: float = float(os.getenv("BOT_REGIME_RANGE_RATIO", "0.85"))
+    volatility_atr_length: int = int(os.getenv("BOT_VOLATILITY_ATR_LENGTH", "14"))
+    volatility_low_ratio: float = float(os.getenv("BOT_VOLATILITY_LOW_RATIO", "0.0015"))
+    volatility_high_ratio: float = float(os.getenv("BOT_VOLATILITY_HIGH_RATIO", "0.004"))
+    quality_grade_a: int = int(os.getenv("BOT_QUALITY_GRADE_A", "8"))
+    quality_grade_b: int = int(os.getenv("BOT_QUALITY_GRADE_B", "6"))
+    min_quality_grade: str = os.getenv("BOT_MIN_QUALITY_GRADE", "B")
+    high_vol_min_quality: str = os.getenv("BOT_HIGH_VOL_MIN_QUALITY", "A")
+    allowed_regimes: list[str] | str = os.getenv("BOT_ALLOWED_REGIMES", "TRENDING,RANGING")
 
     feature_interval_seconds: float = float(os.getenv("BOT_FEATURE_INTERVAL_SECONDS", "1.0"))
     oi_poll_seconds: int = int(os.getenv("BOT_OI_POLL_SECONDS", "15"))
@@ -94,7 +106,7 @@ class Settings:
     stop_buffer_atr_mult: float = float(os.getenv("BOT_STOP_BUFFER_ATR_MULT", "0.2"))
     trend_buffer_atr_mult: float = float(os.getenv("BOT_TREND_BUFFER_ATR_MULT", "0.2"))
     delta_expand_ratio: float = float(os.getenv("BOT_DELTA_EXPAND_RATIO", "0.6"))
-    sl_volatility_atr_mult: float = float(os.getenv("BOT_SL_VOLATILITY_ATR_MULT", "1.0"))
+    sl_volatility_atr_mult: float = float(os.getenv("BOT_SL_VOLATILITY_ATR_MULT", "1.2"))
     sl_spread_buffer_mult: float = float(os.getenv("BOT_SL_SPREAD_BUFFER_MULT", "3.0"))
     tp1_structure_fraction: float = float(os.getenv("BOT_TP1_STRUCTURE_FRACTION", "0.5"))
     tp1_atr_fallback: float = float(os.getenv("BOT_TP1_ATR_FALLBACK", "2.0"))
@@ -121,6 +133,8 @@ class Settings:
                 f"{self.symbol}@aggTrade",
                 f"{self.symbol}@forceOrder",
             ]
+        if isinstance(self.allowed_regimes, str):
+            self.allowed_regimes = [v.strip().upper() for v in self.allowed_regimes.split(",") if v.strip()]
         STORAGE_DIR.mkdir(parents=True, exist_ok=True)
         RAW_EVENTS_DIR.mkdir(parents=True, exist_ok=True)
 

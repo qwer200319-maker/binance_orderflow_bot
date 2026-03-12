@@ -32,7 +32,10 @@ from strategy.signal_formatter import format_signal
 from strategy.signal_rules import decide_signal
 from strategy.htf_bias import classify_bias
 from strategy.liquidity_sweep import detect_liquidity_sweep
+from strategy.regime_detector import detect_regime
 from strategy.setup_15m import detect_setup
+from strategy.signal_quality import compute_quality
+from strategy.volatility_filter import classify_volatility
 from strategy.vwap_context import vwap_context
 from utils.json_store import JsonLineStore, JsonStore
 from utils.logger import get_logger
@@ -89,6 +92,10 @@ class BotApp:
         self.vwap_state: str = "NEUTRAL"
         self.vwap_reclaim: bool = False
         self.vwap_reject: bool = False
+        self.market_regime: str = "UNKNOWN"
+        self.regime_context: Dict[str, Any] = {}
+        self.volatility_state: str = "UNKNOWN"
+        self.volatility_value: float = 0.0
         self.last_htf_refresh: float = 0.0
         self.last_setup_refresh: float = 0.0
         self.last_feature_payload: Dict[str, Any] = {}
@@ -324,6 +331,22 @@ class BotApp:
             candles,
             settings.vwap_lookback_candles,
         )
+        regime, regime_ctx = detect_regime(
+            candles,
+            settings.regime_lookback_candles,
+            settings.htf_ema_fast,
+            settings.htf_ema_slow,
+            settings.htf_ema_flat_ratio,
+            settings.regime_expansion_ratio,
+            settings.regime_chop_crosses,
+            settings.regime_range_ratio,
+        )
+        vol_state, vol_value = classify_volatility(
+            candles,
+            settings.volatility_atr_length,
+            settings.volatility_low_ratio,
+            settings.volatility_high_ratio,
+        )
         self.setup_signal = setup
         self.setup_context = context
         self.sweep_context = {
@@ -340,6 +363,10 @@ class BotApp:
         self.vwap_state = vwap_state
         self.vwap_reclaim = vwap_reclaim
         self.vwap_reject = vwap_reject
+        self.market_regime = regime
+        self.regime_context = regime_ctx
+        self.volatility_state = vol_state
+        self.volatility_value = vol_value
         self.setup_backoff_seconds = settings.rest_backoff_seconds
         self.last_setup_refresh = now_ts()
         return True
@@ -594,6 +621,9 @@ class BotApp:
             "vwap_context": self.vwap_state,
             "vwap_reclaim": self.vwap_reclaim,
             "vwap_reject": self.vwap_reject,
+            "market_regime": self.market_regime,
+            "volatility_state": self.volatility_state,
+            "volatility_value": self.volatility_value,
             "funding_rate": self.current_funding_rate,
             "open_interest": self.current_open_interest,
             "oi_change": oi_change,
@@ -646,6 +676,8 @@ class BotApp:
             "active_sell_liq_cluster": liq_active_summary.get("recent_sell_liq_cluster", False),
             "active_buy_liq_cluster": liq_active_summary.get("recent_buy_liq_cluster", False),
         }
+        features["quality_score"] = 0
+        features["quality_grade"] = ""
         self.last_feature_payload = features
         return features
 
@@ -654,7 +686,16 @@ class BotApp:
             try:
                 features = self.build_feature_snapshot()
                 self.feature_store.append(features)
-                signal, setup_long, setup_short, confirm_long, confirm_short = decide_signal(features)
+                (
+                    signal,
+                    setup_long,
+                    setup_short,
+                    confirm_long,
+                    confirm_short,
+                    long_quality_score,
+                    short_quality_score,
+                    quality_grade,
+                ) = decide_signal(features)
                 current_price = features.get("mid_price", 0.0)
                 long_score = setup_long + confirm_long
                 short_score = setup_short + confirm_short
@@ -699,6 +740,8 @@ class BotApp:
                         "vwap_reclaim": self.vwap_reclaim,
                         "vwap_reject": self.vwap_reject,
                         "vwap": self.vwap_value,
+                        "market_regime": self.market_regime,
+                        "volatility_state": self.volatility_state,
                         "trigger_high": features.get("long_trigger"),
                         "trigger_low": features.get("short_trigger"),
                         "setup_long": setup_long,
@@ -707,6 +750,8 @@ class BotApp:
                         "confirm_short": confirm_short,
                         "long_score": long_score,
                         "short_score": short_score,
+                        "quality_score": long_quality_score if signal == "LONG" else short_quality_score,
+                        "quality_grade": quality_grade,
                     }
                     self.signal_store.append(signal_payload)
                     self.last_signal_ts = now
@@ -745,6 +790,8 @@ class BotApp:
             "vwap_context": self.vwap_state,
             "vwap_reclaim": self.vwap_reclaim,
             "vwap_reject": self.vwap_reject,
+            "market_regime": self.market_regime,
+            "volatility_state": self.volatility_state,
             "last_features": self.last_feature_payload,
         }
         self.state_store.save(payload)
