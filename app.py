@@ -267,8 +267,10 @@ class BotApp:
 
         bias, context = classify_bias(
             candles,
-            settings.htf_ema_length,
+            settings.htf_ema_fast,
+            settings.htf_ema_slow,
             settings.htf_swing_lookback,
+            settings.htf_ema_flat_ratio,
         )
         self.htf_bias = bias
         self.htf_context = context

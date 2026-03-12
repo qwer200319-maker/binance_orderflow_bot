@@ -28,29 +28,36 @@ def recent_swings(candles: List[dict], lookback: int) -> tuple[float, float, flo
 
 def classify_bias(
     candles: List[dict],
-    ema_length: int,
+    ema_fast: int,
+    ema_slow: int,
     swing_lookback: int,
+    flat_ratio: float,
 ) -> tuple[str, dict]:
-    if len(candles) < max(ema_length, swing_lookback * 2):
+    if len(candles) < max(ema_slow, swing_lookback * 2):
         return "NEUTRAL", {}
 
     closes = [c["close"] for c in candles]
     last_close = closes[-1]
-    ema_val = ema(closes[-ema_length:], ema_length)
+    ema_fast_val = ema(closes[-ema_fast:], ema_fast)
+    ema_slow_val = ema(closes[-ema_slow:], ema_slow)
 
     recent_high, recent_low, prev_high, prev_low = recent_swings(candles, swing_lookback)
 
-    bullish_structure = recent_high > prev_high and recent_low > prev_low
-    bearish_structure = recent_high < prev_high and recent_low < prev_low
+    bullish_structure = recent_high > prev_high and recent_low >= prev_low
+    bearish_structure = recent_high < prev_high and recent_low <= prev_low
 
     bias = "NEUTRAL"
-    if last_close > ema_val and bullish_structure:
+    ema_separation = abs(ema_fast_val - ema_slow_val) / ema_slow_val if ema_slow_val > 0 else 0.0
+    tangled = ema_separation < flat_ratio or (min(ema_fast_val, ema_slow_val) <= last_close <= max(ema_fast_val, ema_slow_val))
+
+    if not tangled and last_close > ema_fast_val and ema_fast_val > ema_slow_val and bullish_structure:
         bias = "BULLISH"
-    elif last_close < ema_val and bearish_structure:
+    elif not tangled and last_close < ema_fast_val and ema_fast_val < ema_slow_val and bearish_structure:
         bias = "BEARISH"
 
     context = {
-        "ema": ema_val,
+        "ema_fast": ema_fast_val,
+        "ema_slow": ema_slow_val,
         "last_close": last_close,
         "recent_high": recent_high,
         "recent_low": recent_low,
@@ -58,5 +65,7 @@ def classify_bias(
         "prev_low": prev_low,
         "bullish_structure": bullish_structure,
         "bearish_structure": bearish_structure,
+        "ema_separation": ema_separation,
+        "tangled": tangled,
     }
     return bias, context

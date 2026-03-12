@@ -64,6 +64,8 @@ def detect_setup(
         "prev_low": prev_low,
         "support": recent_low,
         "resistance": recent_high,
+        "support_zone": recent_low,
+        "resistance_zone": recent_high,
         "trigger_high": recent_high,
         "trigger_low": recent_low,
         "sweep_low": sweep_low,
