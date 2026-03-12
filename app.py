@@ -8,6 +8,7 @@ import aiohttp
 from dotenv import load_dotenv
 
 from config import RAW_EVENTS_DIR, STORAGE_DIR, settings
+from feeds.candle_loader import fetch_klines
 from feeds.depth_stream import parse_depth_message
 from feeds.liquidation_stream import parse_force_order_message
 from feeds.oi_funding_loader import fetch_funding_rate, fetch_open_interest
@@ -29,6 +30,8 @@ from risk.filters import signal_allowed
 from risk.sltp import build_trade_plan
 from strategy.signal_formatter import format_signal
 from strategy.signal_rules import decide_signal
+from strategy.htf_bias import classify_bias
+from strategy.setup_15m import detect_setup
 from utils.json_store import JsonLineStore, JsonStore
 from utils.logger import get_logger
 from utils.math_utils import mean
@@ -74,14 +77,24 @@ class BotApp:
         self.last_signal_price: float | None = None
         self.last_signal_long_score: int | None = None
         self.last_signal_short_score: int | None = None
+        self.htf_bias: str = "NEUTRAL"
+        self.htf_context: Dict[str, Any] = {}
+        self.setup_signal: str = "NONE"
+        self.setup_context: Dict[str, Any] = {}
+        self.last_htf_refresh: float = 0.0
+        self.last_setup_refresh: float = 0.0
         self.last_feature_payload: Dict[str, Any] = {}
         self.running = True
         self.oi_backoff_until: float = 0.0
         self.funding_backoff_until: float = 0.0
         self.snapshot_backoff_until: float = 0.0
+        self.htf_backoff_until: float = 0.0
+        self.setup_backoff_until: float = 0.0
         self.oi_backoff_seconds: int = settings.rest_backoff_seconds
         self.funding_backoff_seconds: int = settings.rest_backoff_seconds
         self.snapshot_backoff_seconds: int = settings.rest_backoff_seconds
+        self.htf_backoff_seconds: int = settings.rest_backoff_seconds
+        self.setup_backoff_seconds: int = settings.rest_backoff_seconds
         self.last_snapshot_warn_ts: float = 0.0
 
     async def initialize(self, session: aiohttp.ClientSession) -> None:
@@ -92,6 +105,8 @@ class BotApp:
             await asyncio.sleep(settings.reconnect_delay_seconds)
         await self.refresh_oi(session)
         await self.refresh_funding(session)
+        await self.refresh_htf_bias(session)
+        await self.refresh_setup(session)
         self.persist_state()
 
     async def refresh_snapshot(self, session: aiohttp.ClientSession) -> bool:
@@ -226,6 +241,76 @@ class BotApp:
         self.funding_backoff_seconds = settings.rest_backoff_seconds
         return True
 
+    async def refresh_htf_bias(self, session: aiohttp.ClientSession) -> bool:
+        try:
+            candles = await fetch_klines(
+                session,
+                settings.rest_base_url,
+                settings.market_symbol,
+                settings.htf_interval,
+                settings.htf_candle_limit,
+            )
+        except aiohttp.ClientResponseError as exc:
+            if exc.status in (451, 429):
+                self.htf_backoff_until = now_ts() + self.htf_backoff_seconds
+                self.htf_backoff_seconds = min(
+                    self.htf_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
+            raise
+        except (asyncio.TimeoutError, aiohttp.ClientError):
+            self.htf_backoff_until = now_ts() + self.htf_backoff_seconds
+            self.htf_backoff_seconds = min(
+                self.htf_backoff_seconds * 2, settings.rest_backoff_max_seconds
+            )
+            return False
+
+        bias, context = classify_bias(
+            candles,
+            settings.htf_ema_length,
+            settings.htf_swing_lookback,
+        )
+        self.htf_bias = bias
+        self.htf_context = context
+        self.htf_backoff_seconds = settings.rest_backoff_seconds
+        self.last_htf_refresh = now_ts()
+        return True
+
+    async def refresh_setup(self, session: aiohttp.ClientSession) -> bool:
+        try:
+            candles = await fetch_klines(
+                session,
+                settings.rest_base_url,
+                settings.market_symbol,
+                settings.setup_interval,
+                settings.setup_candle_limit,
+            )
+        except aiohttp.ClientResponseError as exc:
+            if exc.status in (451, 429):
+                self.setup_backoff_until = now_ts() + self.setup_backoff_seconds
+                self.setup_backoff_seconds = min(
+                    self.setup_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
+            raise
+        except (asyncio.TimeoutError, aiohttp.ClientError):
+            self.setup_backoff_until = now_ts() + self.setup_backoff_seconds
+            self.setup_backoff_seconds = min(
+                self.setup_backoff_seconds * 2, settings.rest_backoff_max_seconds
+            )
+            return False
+
+        setup, context = detect_setup(
+            candles,
+            settings.setup_swing_lookback,
+            settings.setup_zone_buffer_mult,
+        )
+        self.setup_signal = setup
+        self.setup_context = context
+        self.setup_backoff_seconds = settings.rest_backoff_seconds
+        self.last_setup_refresh = now_ts()
+        return True
+
     async def periodic_rest_tasks(self, session: aiohttp.ClientSession) -> None:
         last_oi_refresh = 0.0
         last_funding_refresh = 0.0
@@ -240,6 +325,10 @@ class BotApp:
                         last_funding_refresh = now
                 if now >= self.snapshot_backoff_until and now - self.last_snapshot_ts >= settings.snapshot_refresh_seconds:
                     await self.refresh_snapshot(session)
+                if now >= self.htf_backoff_until and now - self.last_htf_refresh >= settings.htf_poll_seconds:
+                    await self.refresh_htf_bias(session)
+                if now >= self.setup_backoff_until and now - self.last_setup_refresh >= settings.setup_poll_seconds:
+                    await self.refresh_setup(session)
             except Exception as exc:  # noqa: BLE001
                 self.logger.exception("REST task error: %s", exc)
             await asyncio.sleep(1)
@@ -340,6 +429,17 @@ class BotApp:
         diffs = [abs(prices[i] - prices[i - 1]) for i in range(1, len(prices))]
         return max(mean(diffs), settings.default_tick_size * 5)
 
+    def price_window_stats(self, window_sec: int, offset_sec: int = 0) -> tuple[float, float, float]:
+        now = now_ts()
+        prices = [
+            float(p["price"])
+            for p in self.trades_buffer.prices
+            if offset_sec < (now - float(p["ts"])) <= (offset_sec + window_sec)
+        ]
+        if not prices:
+            return 0.0, 0.0, 0.0
+        return max(prices), min(prices), mean(prices)
+
     def compute_bid_ask_avg_qty(self) -> tuple[float, float]:
         top_bids = self.book.top_bids(settings.top_levels)
         top_asks = self.book.top_asks(settings.top_levels)
@@ -355,11 +455,58 @@ class BotApp:
 
         book_snapshot = build_book_snapshot(self.book)
         price_change = self.compute_price_change(settings.price_change_window_seconds)
+        delta_5s = self.cvd.window_delta(now, settings.delta_confirm_window_seconds)
         delta_15s = self.cvd.window_delta(now, settings.delta_window_seconds)
         cvd_change = self.cvd.window_delta(now, settings.cvd_window_seconds)
         oi_change = self.current_open_interest - self.previous_open_interest
         tick_size = settings.default_tick_size
         price_move_ticks = price_change / tick_size if tick_size > 0 else 0.0
+        micro_atr = self.compute_micro_atr()
+        entry_buffer = max(
+            micro_atr * settings.entry_atr_buffer_mult,
+            book_snapshot["spread"] * settings.entry_spread_buffer_mult,
+        )
+
+        recent_high, recent_low, _ = self.price_window_stats(settings.trigger_lookback_seconds)
+        prev_high, prev_low, _ = self.price_window_stats(
+            settings.trigger_lookback_seconds,
+            settings.trigger_lookback_seconds,
+        )
+        swing_high, swing_low, _ = self.price_window_stats(settings.swing_lookback_seconds)
+        trend_high, trend_low, _ = self.price_window_stats(settings.trend_window_seconds)
+        prev_trend_high, prev_trend_low, _ = self.price_window_stats(
+            settings.trend_window_seconds,
+            settings.trend_window_seconds,
+        )
+
+        trend_buffer = micro_atr * settings.trend_buffer_atr_mult
+        trend_higher_highs = prev_trend_high > 0 and trend_high > (prev_trend_high + trend_buffer)
+        trend_lower_lows = prev_trend_low > 0 and trend_low < (prev_trend_low - trend_buffer)
+
+        stop_buffer = micro_atr * settings.stop_buffer_atr_mult
+        mid_price = book_snapshot["mid_price"]
+        stopped_making_lows = recent_low > 0 and mid_price > (recent_low + stop_buffer)
+        stopped_making_highs = recent_high > 0 and mid_price < (recent_high - stop_buffer)
+
+        setup_trigger_high = float(self.setup_context.get("trigger_high", 0.0))
+        setup_trigger_low = float(self.setup_context.get("trigger_low", 0.0))
+        long_trigger = setup_trigger_high if setup_trigger_high > 0 else recent_high
+        short_trigger = setup_trigger_low if setup_trigger_low > 0 else recent_low
+        long_entry = (long_trigger + entry_buffer) if long_trigger > 0 else 0.0
+        short_entry = (short_trigger - entry_buffer) if short_trigger > 0 else 0.0
+        long_reclaim = long_entry > 0 and mid_price >= long_entry
+        short_break = short_entry > 0 and mid_price <= short_entry
+
+        delta_expanding_up = (
+            delta_5s > 0
+            and delta_15s > 0
+            and abs(delta_5s) >= abs(delta_15s) * settings.delta_expand_ratio
+        )
+        delta_expanding_down = (
+            delta_5s < 0
+            and delta_15s < 0
+            and abs(delta_5s) >= abs(delta_15s) * settings.delta_expand_ratio
+        )
 
         bid_persistence_count = len(book_snapshot.get("bid_walls", []))
         ask_persistence_count = len(book_snapshot.get("ask_walls", []))
@@ -389,29 +536,76 @@ class BotApp:
             settings.liq_price_bin,
             settings.liq_min_cluster_count,
         )
+        liq_active_summary = self.liquidations.summarize(
+            now,
+            settings.liq_active_window_sec,
+            settings.liq_price_bin,
+            settings.liq_min_cluster_count,
+        )
 
         features: Dict[str, Any] = {
             "ts": iso_utc(now),
-            "mid_price": book_snapshot["mid_price"],
+            "mid_price": mid_price,
             "spread": book_snapshot["spread"],
             "imbalance": book_snapshot["imbalance"],
             "cvd": self.cvd.value,
+            "delta_5s": delta_5s,
             "delta_15s": delta_15s,
             "price_change": price_change,
             "price_move_ticks": price_move_ticks,
+            "htf_bias": self.htf_bias,
+            "setup_signal": self.setup_signal,
             "funding_rate": self.current_funding_rate,
             "open_interest": self.current_open_interest,
             "oi_change": oi_change,
+            "micro_atr": micro_atr,
+            "entry_buffer": entry_buffer,
+            "recent_high": recent_high,
+            "recent_low": recent_low,
+            "prev_high": prev_high,
+            "prev_low": prev_low,
+            "swing_high": swing_high,
+            "swing_low": swing_low,
+            "swing_high_15m": float(self.setup_context.get("recent_high", 0.0)),
+            "swing_low_15m": float(self.setup_context.get("recent_low", 0.0)),
+            "support_15m": float(self.setup_context.get("support", 0.0)),
+            "resistance_15m": float(self.setup_context.get("resistance", 0.0)),
+            "swing_high_1h": float(self.htf_context.get("recent_high", 0.0)),
+            "swing_low_1h": float(self.htf_context.get("recent_low", 0.0)),
+            "trend_high": trend_high,
+            "trend_low": trend_low,
+            "trend_higher_highs": trend_higher_highs,
+            "trend_lower_lows": trend_lower_lows,
+            "stopped_making_lows": stopped_making_lows,
+            "stopped_making_highs": stopped_making_highs,
+            "long_trigger": long_trigger,
+            "short_trigger": short_trigger,
+            "long_reclaim": long_reclaim,
+            "short_break": short_break,
+            "long_entry": long_entry,
+            "short_entry": short_entry,
+            "delta_expanding_up": delta_expanding_up,
+            "delta_expanding_down": delta_expanding_down,
             "bullish_absorption": bullish_absorption,
             "bearish_absorption": bearish_absorption,
             "bullish_divergence": detect_bullish_divergence(
-                price_change, cvd_change, oi_change, self.current_funding_rate
+                price_change,
+                cvd_change,
+                oi_change,
+                self.current_funding_rate,
+                settings.divergence_min_price_change,
             ),
             "bearish_divergence": detect_bearish_divergence(
-                price_change, cvd_change, oi_change, self.current_funding_rate
+                price_change,
+                cvd_change,
+                oi_change,
+                self.current_funding_rate,
+                settings.divergence_min_price_change,
             ),
             **spoof_summary,
             **liq_summary,
+            "active_sell_liq_cluster": liq_active_summary.get("recent_sell_liq_cluster", False),
+            "active_buy_liq_cluster": liq_active_summary.get("recent_buy_liq_cluster", False),
         }
         self.last_feature_payload = features
         return features
@@ -421,16 +615,26 @@ class BotApp:
             try:
                 features = self.build_feature_snapshot()
                 self.feature_store.append(features)
-                signal, long_score, short_score = decide_signal(features)
+                signal, setup_long, setup_short, confirm_long, confirm_short = decide_signal(features)
                 current_price = features.get("mid_price", 0.0)
+                long_score = setup_long + confirm_long
+                short_score = setup_short + confirm_short
                 now = now_ts()
                 if signal and current_price > 0 and signal_allowed(
                     self.last_signal_ts, now, settings.min_signal_cooldown_seconds
                 ):
+                    entry_price = (
+                        features.get("long_entry", 0.0)
+                        if signal == "LONG"
+                        else features.get("short_entry", 0.0)
+                    )
+                    if entry_price <= 0:
+                        await asyncio.sleep(settings.feature_interval_seconds)
+                        continue
                     if not self._repeat_signal_allowed(signal, current_price, long_score, short_score):
                         await asyncio.sleep(settings.feature_interval_seconds)
                         continue
-                    plan = build_trade_plan(signal, current_price, self.compute_micro_atr())
+                    plan = build_trade_plan(signal, entry_price, features)
                     message = format_signal(
                         settings.market_symbol,
                         signal,
@@ -448,6 +652,14 @@ class BotApp:
                         "sl": plan["sl"],
                         "tp1": plan["tp1"],
                         "tp2": plan["tp2"],
+                        "htf_bias": self.htf_bias,
+                        "setup_signal": self.setup_signal,
+                        "trigger_high": features.get("long_trigger"),
+                        "trigger_low": features.get("short_trigger"),
+                        "setup_long": setup_long,
+                        "setup_short": setup_short,
+                        "confirm_long": confirm_long,
+                        "confirm_short": confirm_short,
                         "long_score": long_score,
                         "short_score": short_score,
                     }
@@ -481,6 +693,8 @@ class BotApp:
             "last_signal_price": self.last_signal_price,
             "last_signal_long_score": self.last_signal_long_score,
             "last_signal_short_score": self.last_signal_short_score,
+            "htf_bias": self.htf_bias,
+            "setup_signal": self.setup_signal,
             "last_features": self.last_feature_payload,
         }
         self.state_store.save(payload)

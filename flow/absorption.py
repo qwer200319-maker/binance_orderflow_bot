@@ -14,12 +14,12 @@ def detect_absorption(
 ) -> Tuple[bool, bool]:
     bullish = (
         delta_15s < -delta_threshold
-        and price_move_ticks >= -max_price_move_ticks
+        and abs(price_move_ticks) <= max_price_move_ticks
         and bid_persistence_count >= min_persistence
     )
     bearish = (
         delta_15s > delta_threshold
-        and price_move_ticks <= max_price_move_ticks
+        and abs(price_move_ticks) <= max_price_move_ticks
         and ask_persistence_count >= min_persistence
     )
     return bullish, bearish
