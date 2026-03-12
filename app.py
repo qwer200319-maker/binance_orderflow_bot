@@ -31,7 +31,9 @@ from risk.sltp import build_trade_plan
 from strategy.signal_formatter import format_signal
 from strategy.signal_rules import decide_signal
 from strategy.htf_bias import classify_bias
+from strategy.liquidity_sweep import detect_liquidity_sweep
 from strategy.setup_15m import detect_setup
+from strategy.vwap_context import vwap_context
 from utils.json_store import JsonLineStore, JsonStore
 from utils.logger import get_logger
 from utils.math_utils import mean
@@ -81,6 +83,12 @@ class BotApp:
         self.htf_context: Dict[str, Any] = {}
         self.setup_signal: str = "NONE"
         self.setup_context: Dict[str, Any] = {}
+        self.sweep_context: Dict[str, Any] = {}
+        self.vwap_context: Dict[str, Any] = {}
+        self.vwap_value: float = 0.0
+        self.vwap_state: str = "NEUTRAL"
+        self.vwap_reclaim: bool = False
+        self.vwap_reject: bool = False
         self.last_htf_refresh: float = 0.0
         self.last_setup_refresh: float = 0.0
         self.last_feature_payload: Dict[str, Any] = {}
@@ -307,8 +315,31 @@ class BotApp:
             settings.setup_swing_lookback,
             settings.setup_zone_buffer_mult,
         )
+        bullish_sweep, bearish_sweep, sweep_ctx = detect_liquidity_sweep(
+            candles,
+            settings.setup_swing_lookback,
+            settings.sweep_lookback_candles,
+        )
+        vwap_state, vwap_reclaim, vwap_reject, vwap_val = vwap_context(
+            candles,
+            settings.vwap_lookback_candles,
+        )
         self.setup_signal = setup
         self.setup_context = context
+        self.sweep_context = {
+            "bullish_sweep": bullish_sweep,
+            "bearish_sweep": bearish_sweep,
+            **sweep_ctx,
+        }
+        self.vwap_context = {
+            "state": vwap_state,
+            "reclaim": vwap_reclaim,
+            "reject": vwap_reject,
+        }
+        self.vwap_value = vwap_val
+        self.vwap_state = vwap_state
+        self.vwap_reclaim = vwap_reclaim
+        self.vwap_reject = vwap_reject
         self.setup_backoff_seconds = settings.rest_backoff_seconds
         self.last_setup_refresh = now_ts()
         return True
@@ -557,6 +588,12 @@ class BotApp:
             "price_move_ticks": price_move_ticks,
             "htf_bias": self.htf_bias,
             "setup_signal": self.setup_signal,
+            "bullish_sweep": self.sweep_context.get("bullish_sweep", False),
+            "bearish_sweep": self.sweep_context.get("bearish_sweep", False),
+            "vwap": self.vwap_value,
+            "vwap_context": self.vwap_state,
+            "vwap_reclaim": self.vwap_reclaim,
+            "vwap_reject": self.vwap_reject,
             "funding_rate": self.current_funding_rate,
             "open_interest": self.current_open_interest,
             "oi_change": oi_change,
@@ -656,6 +693,12 @@ class BotApp:
                         "tp2": plan["tp2"],
                         "htf_bias": self.htf_bias,
                         "setup_signal": self.setup_signal,
+                        "bullish_sweep": self.sweep_context.get("bullish_sweep", False),
+                        "bearish_sweep": self.sweep_context.get("bearish_sweep", False),
+                        "vwap_context": self.vwap_state,
+                        "vwap_reclaim": self.vwap_reclaim,
+                        "vwap_reject": self.vwap_reject,
+                        "vwap": self.vwap_value,
                         "trigger_high": features.get("long_trigger"),
                         "trigger_low": features.get("short_trigger"),
                         "setup_long": setup_long,
@@ -697,6 +740,11 @@ class BotApp:
             "last_signal_short_score": self.last_signal_short_score,
             "htf_bias": self.htf_bias,
             "setup_signal": self.setup_signal,
+            "bullish_sweep": self.sweep_context.get("bullish_sweep", False),
+            "bearish_sweep": self.sweep_context.get("bearish_sweep", False),
+            "vwap_context": self.vwap_state,
+            "vwap_reclaim": self.vwap_reclaim,
+            "vwap_reject": self.vwap_reject,
             "last_features": self.last_feature_payload,
         }
         self.state_store.save(payload)

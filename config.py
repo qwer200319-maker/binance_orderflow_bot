@@ -34,6 +34,8 @@ class Settings:
     htf_swing_lookback: int = int(os.getenv("BOT_HTF_SWING_LOOKBACK", "12"))
     setup_swing_lookback: int = int(os.getenv("BOT_SETUP_SWING_LOOKBACK", "16"))
     setup_zone_buffer_mult: float = float(os.getenv("BOT_SETUP_ZONE_BUFFER_MULT", "0.35"))
+    sweep_lookback_candles: int = int(os.getenv("BOT_SWEEP_LOOKBACK_CANDLES", "2"))
+    vwap_lookback_candles: int = int(os.getenv("BOT_VWAP_LOOKBACK_CANDLES", "96"))
 
     feature_interval_seconds: float = float(os.getenv("BOT_FEATURE_INTERVAL_SECONDS", "1.0"))
     oi_poll_seconds: int = int(os.getenv("BOT_OI_POLL_SECONDS", "15"))

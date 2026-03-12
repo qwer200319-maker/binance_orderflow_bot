@@ -12,6 +12,10 @@ def decide_signal(features: dict) -> tuple[str | None, int, int, int, int]:
 
     htf_bias = features.get("htf_bias", "NEUTRAL")
     setup_signal = features.get("setup_signal", "NONE")
+    bullish_sweep = features.get("bullish_sweep", False)
+    bearish_sweep = features.get("bearish_sweep", False)
+    vwap_reclaim = features.get("vwap_reclaim", False)
+    vwap_reject = features.get("vwap_reject", False)
     if htf_bias == "NEUTRAL":
         return None, 0, 0, 0, 0
 
@@ -35,9 +39,13 @@ def decide_signal(features: dict) -> tuple[str | None, int, int, int, int]:
     if setup_signal == "LONG_SETUP":
         setup_short = 0
         confirm_short = 0
+        if not bullish_sweep or not vwap_reclaim:
+            return None, setup_long, setup_short, confirm_long, confirm_short
     elif setup_signal == "SHORT_SETUP":
         setup_long = 0
         confirm_long = 0
+        if not bearish_sweep or not vwap_reject:
+            return None, setup_long, setup_short, confirm_long, confirm_short
     elif setup_signal == "NONE":
         return None, setup_long, setup_short, confirm_long, confirm_short
 
