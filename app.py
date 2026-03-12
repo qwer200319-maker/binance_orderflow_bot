@@ -34,7 +34,6 @@ from strategy.htf_bias import classify_bias
 from strategy.liquidity_sweep import detect_liquidity_sweep
 from strategy.regime_detector import detect_regime
 from strategy.setup_15m import detect_setup
-from strategy.signal_quality import compute_quality
 from strategy.volatility_filter import classify_volatility
 from strategy.vwap_context import vwap_context
 from utils.json_store import JsonLineStore, JsonStore
@@ -140,6 +139,17 @@ class BotApp:
                     self.snapshot_backoff_seconds * 2, settings.rest_backoff_max_seconds
                 )
                 return False
+            if exc.status == 418:
+                retry_after = self._retry_after_seconds(exc, self.snapshot_backoff_seconds)
+                self.logger.warning(
+                    "Snapshot rate limited/banned (HTTP 418). Backing off for %ss.",
+                    retry_after,
+                )
+                self.snapshot_backoff_until = now_ts() + retry_after
+                self.snapshot_backoff_seconds = min(
+                    self.snapshot_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
             if exc.status == 429:
                 retry_after = self._retry_after_seconds(exc, self.snapshot_backoff_seconds)
                 self.logger.warning(
@@ -187,6 +197,17 @@ class BotApp:
                     self.oi_backoff_seconds * 2, settings.rest_backoff_max_seconds
                 )
                 return False
+            if exc.status == 418:
+                retry_after = self._retry_after_seconds(exc, self.oi_backoff_seconds)
+                self.logger.warning(
+                    "Open interest rate limited/banned (HTTP 418). Backing off for %ss.",
+                    retry_after,
+                )
+                self.oi_backoff_until = now_ts() + retry_after
+                self.oi_backoff_seconds = min(
+                    self.oi_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
             if exc.status == 429:
                 retry_after = self._retry_after_seconds(exc, self.oi_backoff_seconds)
                 self.logger.warning(
@@ -230,6 +251,17 @@ class BotApp:
                     self.funding_backoff_seconds * 2, settings.rest_backoff_max_seconds
                 )
                 return False
+            if exc.status == 418:
+                retry_after = self._retry_after_seconds(exc, self.funding_backoff_seconds)
+                self.logger.warning(
+                    "Funding rate rate limited/banned (HTTP 418). Backing off for %ss.",
+                    retry_after,
+                )
+                self.funding_backoff_until = now_ts() + retry_after
+                self.funding_backoff_seconds = min(
+                    self.funding_backoff_seconds * 2, settings.rest_backoff_max_seconds
+                )
+                return False
             if exc.status == 429:
                 retry_after = self._retry_after_seconds(exc, self.funding_backoff_seconds)
                 self.logger.warning(
@@ -266,7 +298,7 @@ class BotApp:
                 settings.htf_candle_limit,
             )
         except aiohttp.ClientResponseError as exc:
-            if exc.status in (451, 429):
+            if exc.status in (418, 429, 451):
                 self.htf_backoff_until = now_ts() + self.htf_backoff_seconds
                 self.htf_backoff_seconds = min(
                     self.htf_backoff_seconds * 2, settings.rest_backoff_max_seconds
@@ -303,7 +335,7 @@ class BotApp:
                 settings.setup_candle_limit,
             )
         except aiohttp.ClientResponseError as exc:
-            if exc.status in (451, 429):
+            if exc.status in (418, 429, 451):
                 self.setup_backoff_until = now_ts() + self.setup_backoff_seconds
                 self.setup_backoff_seconds = min(
                     self.setup_backoff_seconds * 2, settings.rest_backoff_max_seconds
