@@ -336,3 +336,11 @@ window.addEventListener("resize", () => drawChart());
 fetchChart();
 pollState();
 connectStream();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => {
+      console.warn("service worker registration failed", err);
+    });
+  });
+}

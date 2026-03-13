@@ -122,6 +122,16 @@ async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
 
 
+@app.get("/manifest.json")
+async def manifest() -> FileResponse:
+    return FileResponse(WEB_DIR / "manifest.json")
+
+
+@app.get("/sw.js")
+async def service_worker() -> FileResponse:
+    return FileResponse(WEB_DIR / "sw.js")
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok", "time": iso_utc()})
