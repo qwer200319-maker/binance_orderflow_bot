@@ -97,6 +97,8 @@ class BotApp:
         self.volatility_value: float = 0.0
         self.last_htf_refresh: float = 0.0
         self.last_setup_refresh: float = 0.0
+        self.last_book_resync_ts: float = 0.0
+        self.last_decision_log_ts: float = 0.0
         self.last_feature_payload: Dict[str, Any] = {}
         self.running = True
         self.oi_backoff_until: float = 0.0
@@ -450,7 +452,10 @@ class BotApp:
                         self.book_sync.buffer_summary(),
                     )
                     self.book_sync.reset()
-                    await self.refresh_snapshot(session)
+                    now = now_ts()
+                    if now - self.last_book_resync_ts >= settings.book_resync_min_seconds:
+                        self.last_book_resync_ts = now
+                        await self.refresh_snapshot(session)
                     return
                 if self.book.last_update_id is None:
                     try:
@@ -460,7 +465,8 @@ class BotApp:
                     return
                 if self.book_sync.needs_snapshot_refresh():
                     now = now_ts()
-                    if now - self.last_snapshot_ts >= 5:
+                    if now - self.last_snapshot_ts >= 5 and now - self.last_book_resync_ts >= settings.book_resync_min_seconds:
+                        self.last_book_resync_ts = now
                         if now - self.last_snapshot_warn_ts >= settings.log_throttle_seconds:
                             self.last_snapshot_warn_ts = now
                             self.logger.warning(
@@ -469,8 +475,11 @@ class BotApp:
                             )
                         await self.refresh_snapshot(session)
                     return
-            self.logger.warning("Order book out of sync. Reinitializing...")
-            await self.refresh_snapshot(session)
+            now = now_ts()
+            if now - self.last_book_resync_ts >= settings.book_resync_min_seconds:
+                self.last_book_resync_ts = now
+                self.logger.warning("Order book out of sync. Reinitializing...")
+                await self.refresh_snapshot(session)
             return
 
         book_snapshot = build_book_snapshot(self.book)
@@ -479,6 +488,13 @@ class BotApp:
         self.wall_tracker.observe(
             "bid",
             bid_walls,
+            now_ts(),
+            self.book.best_bid(),
+            self.book.best_ask(),
+        )
+        self.wall_tracker.observe(
+            "ask",
+            ask_walls,
             now_ts(),
             self.book.best_bid(),
             self.book.best_ask(),
@@ -492,13 +508,6 @@ class BotApp:
         except Exception:  # noqa: BLE001
             return fallback
         return fallback
-        self.wall_tracker.observe(
-            "ask",
-            ask_walls,
-            now_ts(),
-            self.book.best_bid(),
-            self.book.best_ask(),
-        )
 
     def handle_trade_event(self, trade: dict) -> None:
         self.trades_buffer.add_trade(trade)
@@ -732,6 +741,28 @@ class BotApp:
                 long_score = setup_long + confirm_long
                 short_score = setup_short + confirm_short
                 now = now_ts()
+                if settings.decision_log_interval_seconds > 0 and now - self.last_decision_log_ts >= settings.decision_log_interval_seconds:
+                    self.last_decision_log_ts = now
+                    self.logger.info(
+                        "Decision | htf=%s setup=%s sweep=%s/%s vwap=%s(reclaim=%s reject=%s) regime=%s vol=%s | "
+                        "setup L/S=%s/%s confirm L/S=%s/%s | quality L/S=%s/%s | signal=%s",
+                        self.htf_bias,
+                        self.setup_signal,
+                        features.get("bullish_sweep"),
+                        features.get("bearish_sweep"),
+                        self.vwap_state,
+                        self.vwap_reclaim,
+                        self.vwap_reject,
+                        self.market_regime,
+                        self.volatility_state,
+                        setup_long,
+                        setup_short,
+                        confirm_long,
+                        confirm_short,
+                        long_quality_score,
+                        short_quality_score,
+                        signal or "NONE",
+                    )
                 if signal and current_price > 0 and signal_allowed(
                     self.last_signal_ts, now, settings.min_signal_cooldown_seconds
                 ):

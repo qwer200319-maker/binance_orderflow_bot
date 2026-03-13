@@ -30,7 +30,7 @@ class Settings:
     setup_poll_seconds: int = int(os.getenv("BOT_SETUP_POLL_SECONDS", "30"))
     htf_ema_fast: int = int(os.getenv("BOT_HTF_EMA_FAST", "20"))
     htf_ema_slow: int = int(os.getenv("BOT_HTF_EMA_SLOW", "50"))
-    htf_ema_flat_ratio: float = float(os.getenv("BOT_HTF_EMA_FLAT_RATIO", "0.001"))
+    htf_ema_flat_ratio: float = float(os.getenv("BOT_HTF_EMA_FLAT_RATIO", "0.0005"))
     htf_swing_lookback: int = int(os.getenv("BOT_HTF_SWING_LOOKBACK", "12"))
     setup_swing_lookback: int = int(os.getenv("BOT_SETUP_SWING_LOOKBACK", "16"))
     setup_zone_buffer_mult: float = float(os.getenv("BOT_SETUP_ZONE_BUFFER_MULT", "0.35"))
@@ -45,9 +45,9 @@ class Settings:
     volatility_high_ratio: float = float(os.getenv("BOT_VOLATILITY_HIGH_RATIO", "0.004"))
     quality_grade_a: int = int(os.getenv("BOT_QUALITY_GRADE_A", "8"))
     quality_grade_b: int = int(os.getenv("BOT_QUALITY_GRADE_B", "6"))
-    min_quality_grade: str = os.getenv("BOT_MIN_QUALITY_GRADE", "B")
-    high_vol_min_quality: str = os.getenv("BOT_HIGH_VOL_MIN_QUALITY", "A")
-    allowed_regimes: list[str] | str = os.getenv("BOT_ALLOWED_REGIMES", "TRENDING,RANGING")
+    min_quality_grade: str = os.getenv("BOT_MIN_QUALITY_GRADE", "C")
+    high_vol_min_quality: str = os.getenv("BOT_HIGH_VOL_MIN_QUALITY", "B")
+    allowed_regimes: list[str] | str = os.getenv("BOT_ALLOWED_REGIMES", "TRENDING,RANGING,CHOPPY")
 
     feature_interval_seconds: float = float(os.getenv("BOT_FEATURE_INTERVAL_SECONDS", "1.0"))
     oi_poll_seconds: int = int(os.getenv("BOT_OI_POLL_SECONDS", "15"))
@@ -89,10 +89,10 @@ class Settings:
 
     long_signal_score: int = int(os.getenv("BOT_LONG_SIGNAL_SCORE", "6"))
     short_signal_score: int = int(os.getenv("BOT_SHORT_SIGNAL_SCORE", "6"))
-    setup_long_score: int = int(os.getenv("BOT_SETUP_LONG_SCORE", "4"))
-    setup_short_score: int = int(os.getenv("BOT_SETUP_SHORT_SCORE", "4"))
-    confirm_long_score: int = int(os.getenv("BOT_CONFIRM_LONG_SCORE", "3"))
-    confirm_short_score: int = int(os.getenv("BOT_CONFIRM_SHORT_SCORE", "3"))
+    setup_long_score: int = int(os.getenv("BOT_SETUP_LONG_SCORE", "3"))
+    setup_short_score: int = int(os.getenv("BOT_SETUP_SHORT_SCORE", "3"))
+    confirm_long_score: int = int(os.getenv("BOT_CONFIRM_LONG_SCORE", "2"))
+    confirm_short_score: int = int(os.getenv("BOT_CONFIRM_SHORT_SCORE", "2"))
     min_signal_cooldown_seconds: int = int(os.getenv("BOT_SIGNAL_COOLDOWN_SECONDS", "90"))
     min_repeat_price_change: float = float(os.getenv("BOT_MIN_REPEAT_PRICE_CHANGE", "0"))
 
@@ -125,6 +125,8 @@ class Settings:
     log_throttle_seconds: int = int(os.getenv("BOT_LOG_THROTTLE_SECONDS", "30"))
     buffer_log_interval_seconds: float = float(os.getenv("BOT_BUFFER_LOG_INTERVAL_SECONDS", "5"))
     no_match_warn_throttle_seconds: float = float(os.getenv("BOT_NO_MATCH_WARN_THROTTLE_SECONDS", "30"))
+    decision_log_interval_seconds: int = int(os.getenv("BOT_DECISION_LOG_INTERVAL_SECONDS", "60"))
+    book_resync_min_seconds: int = int(os.getenv("BOT_BOOK_RESYNC_MIN_SECONDS", "5"))
 
     def __post_init__(self) -> None:
         if not self.streams:
