@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = "https://binance-orderflow-bot-1ypy.onrender.com";
+const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 
 const params = new URLSearchParams(window.location.search);
 const apiParam = params.get("api");
@@ -346,4 +346,5 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
 
