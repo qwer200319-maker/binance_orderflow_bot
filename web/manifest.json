@@ -4,8 +4,8 @@
   "description": "Live trading terminal dashboard for the orderflow bot.",
   "start_url": "/?source=pwa",
   "display": "standalone",
-  "background_color": "#f3efe7",
-  "theme_color": "#137a72",
+  "background_color": "#e8eef4",
+  "theme_color": "#0c7c88",
   "icons": [
     {
       "src": "/static/icons/icon-192.png",
@@ -25,3 +25,4 @@
     }
   ]
 }
+

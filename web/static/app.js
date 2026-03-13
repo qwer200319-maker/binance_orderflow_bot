@@ -234,8 +234,8 @@ function drawChart() {
   ctx.clearRect(0, 0, width, height);
 
   if (!chartState.points.length) {
-    ctx.fillStyle = "rgba(31, 28, 24, 0.5)";
-    ctx.font = "14px Space Grotesk";
+    ctx.fillStyle = "rgba(15, 23, 34, 0.55)";
+    ctx.font = "14px Sora";
     ctx.fillText("Waiting for data…", 16, 24);
     return;
   }
@@ -258,7 +258,7 @@ function drawChart() {
   const scaleY = (price) =>
     padding + ((max - price) / (max - min)) * (height - padding * 2);
 
-  ctx.strokeStyle = "rgba(19, 122, 114, 0.7)";
+  ctx.strokeStyle = "rgba(12, 124, 136, 0.75)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   chartState.points.forEach((point, idx) => {
@@ -286,15 +286,15 @@ function drawChart() {
   };
 
   const overlays = chartState.overlays || {};
-  drawLevel(overlays.vwap, "rgba(41, 90, 159, 0.8)", "VWAP");
-  drawLevel(overlays.swing_high_1h, "rgba(200, 101, 63, 0.8)", "1H High");
-  drawLevel(overlays.swing_low_1h, "rgba(200, 101, 63, 0.8)", "1H Low");
-  drawLevel(overlays.swing_high_15m, "rgba(19, 122, 114, 0.8)", "15m High");
-  drawLevel(overlays.swing_low_15m, "rgba(19, 122, 114, 0.8)", "15m Low");
-  drawLevel(overlays.entry, "rgba(31, 28, 24, 0.8)", "Entry");
-  drawLevel(overlays.sl, "rgba(142, 36, 38, 0.8)", "SL");
-  drawLevel(overlays.tp1, "rgba(36, 122, 70, 0.8)", "TP1");
-  drawLevel(overlays.tp2, "rgba(36, 122, 70, 0.8)", "TP2");
+  drawLevel(overlays.vwap, "rgba(47, 110, 164, 0.85)", "VWAP");
+  drawLevel(overlays.swing_high_1h, "rgba(227, 154, 23, 0.85)", "1H High");
+  drawLevel(overlays.swing_low_1h, "rgba(227, 154, 23, 0.85)", "1H Low");
+  drawLevel(overlays.swing_high_15m, "rgba(12, 124, 136, 0.85)", "15m High");
+  drawLevel(overlays.swing_low_15m, "rgba(12, 124, 136, 0.85)", "15m Low");
+  drawLevel(overlays.entry, "rgba(15, 23, 34, 0.85)", "Entry");
+  drawLevel(overlays.sl, "rgba(193, 74, 74, 0.9)", "SL");
+  drawLevel(overlays.tp1, "rgba(31, 138, 91, 0.9)", "TP1");
+  drawLevel(overlays.tp2, "rgba(31, 138, 91, 0.9)", "TP2");
 }
 
 async function fetchChart() {
@@ -346,3 +346,4 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
