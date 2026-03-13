@@ -3,13 +3,13 @@ from __future__ import annotations
 from config import settings
 from risk.filters import trend_continuation_block
 from strategy.regime_filter import is_no_trade_regime
-from strategy.score_engine import compute_confirmation_scores, compute_setup_scores
+from strategy.score_engine import orderflow_confirmations
 from strategy.signal_quality import compute_quality
 
 
-def decide_signal(features: dict) -> tuple[str | None, int, int, int, int, int, int, str]:
+def decide_signal(features: dict) -> tuple[str | None, int, str, str]:
     if is_no_trade_regime(features):
-        return None, 0, 0, 0, 0, 0, 0, ""
+        return None, 0, "", ""
 
     htf_bias = features.get("htf_bias", "NEUTRAL")
     setup_signal = features.get("setup_signal", "NONE")
@@ -20,62 +20,42 @@ def decide_signal(features: dict) -> tuple[str | None, int, int, int, int, int, 
     regime = features.get("market_regime", "UNKNOWN")
     volatility = features.get("volatility_state", "UNKNOWN")
     if htf_bias == "NEUTRAL":
-        return None, 0, 0, 0, 0, 0, 0, ""
-    if regime not in settings.allowed_regimes:
-        return None, 0, 0, 0, 0, 0, 0, ""
+        return None, 0, "", ""
+    if regime != "UNKNOWN" and regime not in settings.allowed_regimes:
+        return None, 0, "", ""
     if volatility == "LOW":
-        return None, 0, 0, 0, 0, 0, 0, ""
+        return None, 0, "", ""
 
-    setup_long, setup_short = compute_setup_scores(features)
-    confirm_long, confirm_short = compute_confirmation_scores(features)
+    if setup_signal == "NONE":
+        return None, 0, "", ""
 
     if trend_continuation_block("LONG", features):
-        setup_long = 0
-        confirm_long = 0
+        bullish_sweep = False
     if trend_continuation_block("SHORT", features):
-        setup_short = 0
-        confirm_short = 0
+        bearish_sweep = False
 
-    if htf_bias == "BULLISH":
-        setup_short = 0
-        confirm_short = 0
-    elif htf_bias == "BEARISH":
-        setup_long = 0
-        confirm_long = 0
+    side = "LONG" if setup_signal == "LONG_SETUP" else "SHORT"
+    if (side == "LONG" and htf_bias != "BULLISH") or (side == "SHORT" and htf_bias != "BEARISH"):
+        return None, 0, "", ""
 
-    if setup_signal == "LONG_SETUP":
-        setup_short = 0
-        confirm_short = 0
-        if not bullish_sweep or not vwap_reclaim:
-            return None, setup_long, setup_short, confirm_long, confirm_short, 0, 0, ""
-    elif setup_signal == "SHORT_SETUP":
-        setup_long = 0
-        confirm_long = 0
-        if not bearish_sweep or not vwap_reject:
-            return None, setup_long, setup_short, confirm_long, confirm_short, 0, 0, ""
-    elif setup_signal == "NONE":
-        return None, setup_long, setup_short, confirm_long, confirm_short, 0, 0, ""
+    confirm_count, confirmations = orderflow_confirmations(features, side)
+    if confirm_count < 2:
+        return None, 0, "", ""
 
-    long_quality_score, long_quality_grade = compute_quality("LONG", features, setup_long, confirm_long)
-    short_quality_score, short_quality_grade = compute_quality("SHORT", features, setup_short, confirm_short)
+    setup_ok = True
+    quality_score, quality_grade, reason_summary = compute_quality(
+        side,
+        features,
+        confirmations,
+        setup_ok,
+    )
 
-    if (
-        setup_long >= settings.setup_long_score
-        and confirm_long >= settings.confirm_long_score
-        and (setup_long + confirm_long) > (setup_short + confirm_short)
-        and _grade_allowed(long_quality_grade, volatility)
-    ):
-        return "LONG", setup_long, setup_short, confirm_long, confirm_short, long_quality_score, short_quality_score, long_quality_grade
+    if quality_score < 2:
+        return None, quality_score, quality_grade, reason_summary
+    if not _grade_allowed(quality_grade, volatility):
+        return None, quality_score, quality_grade, reason_summary
 
-    if (
-        setup_short >= settings.setup_short_score
-        and confirm_short >= settings.confirm_short_score
-        and (setup_short + confirm_short) > (setup_long + confirm_long)
-        and _grade_allowed(short_quality_grade, volatility)
-    ):
-        return "SHORT", setup_long, setup_short, confirm_long, confirm_short, long_quality_score, short_quality_score, short_quality_grade
-
-    return None, setup_long, setup_short, confirm_long, confirm_short, long_quality_score, short_quality_score, ""
+    return side, quality_score, quality_grade, reason_summary
 
 
 def _grade_allowed(grade: str, volatility: str) -> bool:

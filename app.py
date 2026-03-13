@@ -766,35 +766,17 @@ class BotApp:
             try:
                 features = self.build_feature_snapshot()
                 self.feature_store.append(features)
-                (
-                    signal,
-                    setup_long,
-                    setup_short,
-                    confirm_long,
-                    confirm_short,
-                    long_quality_score,
-                    short_quality_score,
-                    quality_grade,
-                ) = decide_signal(features)
+                signal, quality_score, quality_grade, reason_summary = decide_signal(features)
                 self.last_decision_signal = signal or "NONE"
-                if signal == "LONG":
-                    self.last_quality_score = long_quality_score
-                    self.last_quality_grade = quality_grade
-                elif signal == "SHORT":
-                    self.last_quality_score = short_quality_score
-                    self.last_quality_grade = quality_grade
-                else:
-                    self.last_quality_score = 0
-                    self.last_quality_grade = ""
+                self.last_quality_score = quality_score
+                self.last_quality_grade = quality_grade
                 current_price = features.get("mid_price", 0.0)
-                long_score = setup_long + confirm_long
-                short_score = setup_short + confirm_short
                 now = now_ts()
                 if settings.decision_log_interval_seconds > 0 and now - self.last_decision_log_ts >= settings.decision_log_interval_seconds:
                     self.last_decision_log_ts = now
                     self.logger.info(
                         "Decision | htf=%s setup=%s sweep=%s/%s vwap=%s(reclaim=%s reject=%s) regime=%s vol=%s | "
-                        "setup L/S=%s/%s confirm L/S=%s/%s | quality L/S=%s/%s | signal=%s",
+                        "quality=%s(%s) | signal=%s | reason=%s",
                         self.htf_bias,
                         self.setup_signal,
                         features.get("bullish_sweep"),
@@ -804,13 +786,10 @@ class BotApp:
                         self.vwap_reject,
                         self.market_regime,
                         self.volatility_state,
-                        setup_long,
-                        setup_short,
-                        confirm_long,
-                        confirm_short,
-                        long_quality_score,
-                        short_quality_score,
+                        quality_grade or "-",
+                        quality_score,
                         signal or "NONE",
+                        reason_summary or "-",
                     )
                 if signal and current_price > 0 and signal_allowed(
                     self.last_signal_ts, now, settings.min_signal_cooldown_seconds
@@ -823,17 +802,18 @@ class BotApp:
                     if entry_price <= 0:
                         await asyncio.sleep(settings.feature_interval_seconds)
                         continue
-                    if not self._repeat_signal_allowed(signal, current_price, long_score, short_score):
+                    if not self._repeat_signal_allowed(signal, current_price, quality_score, quality_score):
                         await asyncio.sleep(settings.feature_interval_seconds)
                         continue
+                    features["quality_score"] = quality_score
+                    features["quality_grade"] = quality_grade
+                    features["reason_summary"] = reason_summary
                     plan = build_trade_plan(signal, entry_price, features)
                     message = format_signal(
                         settings.market_symbol,
                         signal,
                         features,
                         plan,
-                        long_score,
-                        short_score,
                     )
                     await self.telegram.send_message(session, message)
                     signal_payload = {
@@ -856,14 +836,9 @@ class BotApp:
                         "volatility_state": self.volatility_state,
                         "trigger_high": features.get("long_trigger"),
                         "trigger_low": features.get("short_trigger"),
-                        "setup_long": setup_long,
-                        "setup_short": setup_short,
-                        "confirm_long": confirm_long,
-                        "confirm_short": confirm_short,
-                        "long_score": long_score,
-                        "short_score": short_score,
-                        "quality_score": long_quality_score if signal == "LONG" else short_quality_score,
+                        "quality_score": quality_score,
                         "quality_grade": quality_grade,
+                        "reason_summary": reason_summary,
                     }
                     self.signal_store.append(signal_payload)
                     self.last_signal_payload = signal_payload
@@ -872,8 +847,8 @@ class BotApp:
                     self.last_signal_ts = now
                     self.last_signal_side = signal
                     self.last_signal_price = current_price
-                    self.last_signal_long_score = long_score
-                    self.last_signal_short_score = short_score
+                    self.last_signal_long_score = quality_score
+                    self.last_signal_short_score = quality_score
                     self.logger.info("Signal emitted: %s", signal_payload)
                 self.persist_state()
             except Exception as exc:  # noqa: BLE001

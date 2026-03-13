@@ -43,16 +43,17 @@ def classify_bias(
 
     recent_high, recent_low, prev_high, prev_low = recent_swings(candles, swing_lookback)
 
-    bullish_structure = recent_high > prev_high and recent_low >= prev_low
-    bearish_structure = recent_high < prev_high and recent_low <= prev_low
+    lower_low_break = prev_low > 0 and recent_low < prev_low
+    higher_high_break = prev_high > 0 and recent_high > prev_high
 
     bias = "NEUTRAL"
     ema_separation = abs(ema_fast_val - ema_slow_val) / ema_slow_val if ema_slow_val > 0 else 0.0
-    tangled = ema_separation < flat_ratio or (min(ema_fast_val, ema_slow_val) <= last_close <= max(ema_fast_val, ema_slow_val))
+    between_emas = min(ema_fast_val, ema_slow_val) <= last_close <= max(ema_fast_val, ema_slow_val)
+    tangled = ema_separation < flat_ratio or between_emas
 
-    if not tangled and last_close > ema_fast_val and ema_fast_val > ema_slow_val and bullish_structure:
+    if (not tangled) and last_close > ema_slow_val and ema_fast_val > ema_slow_val and not lower_low_break:
         bias = "BULLISH"
-    elif not tangled and last_close < ema_fast_val and ema_fast_val < ema_slow_val and bearish_structure:
+    elif (not tangled) and last_close < ema_slow_val and ema_fast_val < ema_slow_val and not higher_high_break:
         bias = "BEARISH"
 
     context = {
@@ -63,8 +64,8 @@ def classify_bias(
         "recent_low": recent_low,
         "prev_high": prev_high,
         "prev_low": prev_low,
-        "bullish_structure": bullish_structure,
-        "bearish_structure": bearish_structure,
+        "lower_low_break": lower_low_break,
+        "higher_high_break": higher_high_break,
         "ema_separation": ema_separation,
         "tangled": tangled,
     }

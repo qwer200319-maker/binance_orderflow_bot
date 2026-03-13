@@ -13,13 +13,16 @@ def _rr_ratios(side: str, entry: float, sl: float, tp1: float, tp2: float) -> tu
     return rr1, rr2
 
 
-def format_signal(symbol: str, side: str, features: dict, plan: dict, long_score: int, short_score: int) -> str:
+def format_signal(symbol: str, side: str, features: dict, plan: dict) -> str:
     entry = float(plan["entry"])
     sl = float(plan["sl"])
     tp1 = float(plan["tp1"])
     tp2 = float(plan["tp2"])
     rr1, rr2 = _rr_ratios(side, entry, sl, tp1, tp2)
     side_icon = "🟢" if side == "LONG" else "🔴"
+    quality_grade = features.get("quality_grade", "")
+    quality_score = features.get("quality_score", 0)
+    reason_summary = features.get("reason_summary", "")
     return (
         f"🚨 ORDER FLOW SIGNAL\n\n"
         f"Symbol: {symbol}\n"
@@ -28,5 +31,7 @@ def format_signal(symbol: str, side: str, features: dict, plan: dict, long_score
         f"SL: {sl:.2f}\n"
         f"TP1: {tp1:.2f}\n"
         f"TP2: {tp2:.2f}\n"
-        f"R:R TP1: 1:{rr1:.2f} | TP2: 1:{rr2:.2f}"
+        f"R:R TP1: 1:{rr1:.2f} | TP2: 1:{rr2:.2f}\n"
+        f"Quality: {quality_grade} ({quality_score})\n"
+        f"Reason: {reason_summary}"
     )

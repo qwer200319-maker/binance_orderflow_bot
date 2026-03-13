@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from config import settings
-
-
 def grade_quality(score: int) -> str:
-    if score >= settings.quality_grade_a:
+    if score >= 5:
         return "A"
-    if score >= settings.quality_grade_b:
+    if score >= 3:
         return "B"
     return "C"
 
@@ -14,45 +11,56 @@ def grade_quality(score: int) -> str:
 def compute_quality(
     side: str,
     features: dict,
-    setup_score: int,
-    confirm_score: int,
-) -> tuple[int, str]:
+    confirmations: list[str],
+    setup_ok: bool,
+) -> tuple[int, str, str]:
     score = 0
+    reasons: list[str] = []
 
-    htf_bias = features.get("htf_bias", "NEUTRAL")
-    if (side == "LONG" and htf_bias == "BULLISH") or (side == "SHORT" and htf_bias == "BEARISH"):
+    if setup_ok:
         score += 2
+        reasons.append("setup")
 
-    if side == "LONG" and features.get("bullish_sweep", False):
-        score += 1
-    if side == "SHORT" and features.get("bearish_sweep", False):
-        score += 1
-
-    if side == "LONG" and features.get("vwap_reclaim", False):
-        score += 1
-    if side == "SHORT" and features.get("vwap_reject", False):
-        score += 1
-
-    if confirm_score >= settings.confirm_long_score + 1 and side == "LONG":
-        score += 2
-    elif confirm_score >= settings.confirm_short_score + 1 and side == "SHORT":
-        score += 2
-    elif confirm_score >= (settings.confirm_long_score if side == "LONG" else settings.confirm_short_score):
-        score += 1
-
-    regime = features.get("market_regime", "UNKNOWN")
-    if regime in settings.allowed_regimes:
-        score += 1
+    liquidity_event = False
+    if side == "LONG":
+        liquidity_event = (
+            features.get("bullish_sweep", False)
+            or features.get("recent_sell_liq_cluster", False)
+            or features.get("active_sell_liq_cluster", False)
+        )
     else:
-        score -= 1
-
-    volatility = features.get("volatility_state", "UNKNOWN")
-    if volatility == "NORMAL":
+        liquidity_event = (
+            features.get("bearish_sweep", False)
+            or features.get("recent_buy_liq_cluster", False)
+            or features.get("active_buy_liq_cluster", False)
+        )
+    if liquidity_event:
         score += 1
-    elif volatility == "HIGH":
-        score -= 1
-    elif volatility == "LOW":
-        score -= 2
+        reasons.append("liquidity")
 
-    score += max(setup_score, 0)
-    return score, grade_quality(score)
+    if len(confirmations) >= 2:
+        score += 2
+        reasons.append(f"confirm({','.join(confirmations)})")
+
+    context_hits: list[str] = []
+    if side == "LONG":
+        if features.get("vwap_reclaim", False):
+            context_hits.append("vwap")
+        if features.get("funding_rate", 0) < 0:
+            context_hits.append("funding")
+        if features.get("oi_change", 0) > 0:
+            context_hits.append("oi")
+    else:
+        if features.get("vwap_reject", False):
+            context_hits.append("vwap")
+        if features.get("funding_rate", 0) > 0:
+            context_hits.append("funding")
+        if features.get("oi_change", 0) < 0:
+            context_hits.append("oi")
+    if context_hits:
+        score += 1
+        reasons.append(f"context({','.join(context_hits)})")
+
+    grade = grade_quality(score)
+    reason_summary = "; ".join(reasons)
+    return score, grade, reason_summary
