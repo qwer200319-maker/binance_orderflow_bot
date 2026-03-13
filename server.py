@@ -21,6 +21,7 @@ from utils.time_utils import iso_utc, now_ts
 
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
+STATIC_DIR = WEB_DIR / "static"
 
 bot_app = BotApp()
 
@@ -112,8 +113,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if WEB_DIR.exists():
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
