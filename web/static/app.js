@@ -1,7 +1,9 @@
+const DEFAULT_API_BASE = "https://binance-orderflow-bot-1ypy.onrender.com";
+
 const params = new URLSearchParams(window.location.search);
 const apiParam = params.get("api");
 const storedBase = window.localStorage.getItem("apiBase");
-let API_BASE = apiParam || storedBase || "";
+let API_BASE = apiParam || storedBase || DEFAULT_API_BASE || "";
 API_BASE = API_BASE.replace(/\/$/, "");
 if (apiParam) {
   window.localStorage.setItem("apiBase", API_BASE);

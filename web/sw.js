@@ -1,4 +1,4 @@
-const CACHE_NAME = "orderflow-ui-v1";
+const CACHE_NAME = "orderflow-ui-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
