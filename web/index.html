@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orderflow Bot Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <div class="grain"></div>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-title">Orderflow Bot</div>
+          <div class="brand-sub">Trading Terminal Dashboard</div>
+        </div>
+        <div class="top-status">
+          <div class="pill" id="botStatus">BOOTING</div>
+          <div class="meta" id="lastUpdate">--</div>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-block">
+          <div class="hero-label">Symbol</div>
+          <div class="hero-value" id="symbol">--</div>
+        </div>
+        <div class="hero-block">
+          <div class="hero-label">Price</div>
+          <div class="hero-value" id="price">--</div>
+        </div>
+        <div class="hero-block">
+          <div class="hero-label">Current Signal</div>
+          <div class="hero-value" id="currentSignal">--</div>
+        </div>
+        <div class="hero-block">
+          <div class="hero-label">Quality</div>
+          <div class="hero-value" id="qualityScore">--</div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card span-3" style="--i: 0">
+          <div class="card-title">Market Panel</div>
+          <div class="kv">
+            <span>Symbol</span>
+            <span id="marketSymbol">--</span>
+          </div>
+          <div class="kv">
+            <span>Price</span>
+            <span id="marketPrice">--</span>
+          </div>
+          <div class="kv">
+            <span>1H Bias</span>
+            <span id="htfBias">--</span>
+          </div>
+          <div class="kv">
+            <span>15m Setup</span>
+            <span id="setupSignal">--</span>
+          </div>
+          <div class="kv">
+            <span>Regime</span>
+            <span id="marketRegime">--</span>
+          </div>
+          <div class="kv">
+            <span>Volatility</span>
+            <span id="volatility">--</span>
+          </div>
+        </div>
+
+        <div class="card span-3" style="--i: 1">
+          <div class="card-title">Signal Panel</div>
+          <div class="kv">
+            <span>Current Signal</span>
+            <span id="signalCurrent">--</span>
+          </div>
+          <div class="kv">
+            <span>Quality Score</span>
+            <span id="signalQuality">--</span>
+          </div>
+          <div class="kv">
+            <span>Entry</span>
+            <span id="signalEntry">--</span>
+          </div>
+          <div class="kv">
+            <span>SL</span>
+            <span id="signalSL">--</span>
+          </div>
+          <div class="kv">
+            <span>TP1</span>
+            <span id="signalTP1">--</span>
+          </div>
+          <div class="kv">
+            <span>TP2</span>
+            <span id="signalTP2">--</span>
+          </div>
+        </div>
+
+        <div class="card span-3" style="--i: 2">
+          <div class="card-title">Order Flow Panel</div>
+          <div class="kv">
+            <span>Delta 5s</span>
+            <span id="delta5s">--</span>
+          </div>
+          <div class="kv">
+            <span>Delta 15s</span>
+            <span id="delta15s">--</span>
+          </div>
+          <div class="kv">
+            <span>Imbalance</span>
+            <span id="imbalance">--</span>
+          </div>
+          <div class="kv">
+            <span>Absorption</span>
+            <span id="absorption">--</span>
+          </div>
+          <div class="kv">
+            <span>Liquidation Clusters</span>
+            <span id="liquidations">--</span>
+          </div>
+        </div>
+
+        <div class="card span-3" style="--i: 3">
+          <div class="card-title">Context Panel</div>
+          <div class="kv">
+            <span>Liquidity Sweep</span>
+            <span id="liquiditySweep">--</span>
+          </div>
+          <div class="kv">
+            <span>VWAP Context</span>
+            <span id="vwapContext">--</span>
+          </div>
+          <div class="kv">
+            <span>VWAP</span>
+            <span id="vwapValue">--</span>
+          </div>
+        </div>
+
+        <div class="card span-3" style="--i: 4">
+          <div class="card-title">Bot Status</div>
+          <div class="kv">
+            <span>Status</span>
+            <span id="botRunning">--</span>
+          </div>
+          <div class="kv">
+            <span>Last Signal</span>
+            <span id="lastSignalTime">--</span>
+          </div>
+          <div class="kv">
+            <span>Cooldown</span>
+            <span id="cooldownRemaining">--</span>
+          </div>
+        </div>
+
+        <div class="card span-5" style="--i: 5">
+          <div class="card-title">Logs Panel</div>
+          <div class="panel-sub">Recent signals</div>
+          <div class="list" id="signalsList"></div>
+          <div class="panel-sub">Logs</div>
+          <div class="list" id="logsList"></div>
+        </div>
+
+        <div class="card span-7 chart-card" style="--i: 6">
+          <div class="card-title">Chart Panel</div>
+          <div class="chart-meta">
+            <span>Price chart</span>
+            <span>VWAP • Swing levels • Entry/SL/TP</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="priceChart"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

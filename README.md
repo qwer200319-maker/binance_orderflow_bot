@@ -90,6 +90,17 @@ BOT_DIVERGENCE_MIN_PRICE_CHANGE=0.0
 python app.py
 ```
 
+## Dashboard (FastAPI + Live UI)
+Run the bot with a web dashboard and SSE live updates:
+```bash
+python server.py
+```
+Open the UI at `http://localhost:8000`.
+
+Remote API base (when hosting UI separately):
+- Append `?api=https://your-backend-domain` to the URL.
+- The UI will remember the API base in `localStorage`.
+
 ## Deploy on Render (Background Worker)
 This runs the bot as a long-lived background worker.
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections import deque
 from pathlib import Path
 from typing import Any, Dict
 
@@ -42,9 +44,31 @@ from utils.math_utils import mean
 from utils.time_utils import iso_utc, now_ts
 
 
+class LogBuffer(logging.Handler):
+    def __init__(self, maxlen: int = 200) -> None:
+        super().__init__()
+        self.records: deque[dict[str, Any]] = deque(maxlen=maxlen)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.records.append(
+                {
+                    "ts": iso_utc(record.created),
+                    "level": record.levelname,
+                    "logger": record.name,
+                    "message": record.getMessage(),
+                }
+            )
+        except Exception:
+            return
+
+
 class BotApp:
     def __init__(self) -> None:
         self.logger = get_logger("BotApp", settings.log_level)
+        self.log_buffer = LogBuffer(maxlen=250)
+        self.log_buffer.setLevel(logging.DEBUG)
+        self.logger.addHandler(self.log_buffer)
         self.book = LocalBook()
         self.book_sync = BookSynchronizer(
             self.book,
@@ -100,6 +124,13 @@ class BotApp:
         self.last_book_resync_ts: float = 0.0
         self.last_decision_log_ts: float = 0.0
         self.last_feature_payload: Dict[str, Any] = {}
+        self.last_decision_signal: str = "NONE"
+        self.last_quality_score: int = 0
+        self.last_quality_grade: str = ""
+        self.last_signal_payload: Dict[str, Any] | None = None
+        self.last_trade_plan: Dict[str, Any] | None = None
+        self.recent_signals: deque[dict[str, Any]] = deque(maxlen=25)
+        self.price_history: deque[dict[str, float]] = deque(maxlen=600)
         self.running = True
         self.oi_backoff_until: float = 0.0
         self.funding_backoff_until: float = 0.0
@@ -586,6 +617,14 @@ class BotApp:
 
         stop_buffer = micro_atr * settings.stop_buffer_atr_mult
         mid_price = book_snapshot["mid_price"]
+        if mid_price > 0:
+            self.price_history.append(
+                {
+                    "ts": now,
+                    "price": mid_price,
+                    "vwap": self.vwap_value,
+                }
+            )
         stopped_making_lows = recent_low > 0 and mid_price > (recent_low + stop_buffer)
         stopped_making_highs = recent_high > 0 and mid_price < (recent_high - stop_buffer)
 
@@ -737,6 +776,16 @@ class BotApp:
                     short_quality_score,
                     quality_grade,
                 ) = decide_signal(features)
+                self.last_decision_signal = signal or "NONE"
+                if signal == "LONG":
+                    self.last_quality_score = long_quality_score
+                    self.last_quality_grade = quality_grade
+                elif signal == "SHORT":
+                    self.last_quality_score = short_quality_score
+                    self.last_quality_grade = quality_grade
+                else:
+                    self.last_quality_score = 0
+                    self.last_quality_grade = ""
                 current_price = features.get("mid_price", 0.0)
                 long_score = setup_long + confirm_long
                 short_score = setup_short + confirm_short
@@ -817,6 +866,9 @@ class BotApp:
                         "quality_grade": quality_grade,
                     }
                     self.signal_store.append(signal_payload)
+                    self.last_signal_payload = signal_payload
+                    self.last_trade_plan = plan
+                    self.recent_signals.append(signal_payload)
                     self.last_signal_ts = now
                     self.last_signal_side = signal
                     self.last_signal_price = current_price
