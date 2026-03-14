@@ -351,6 +351,7 @@ class BotApp:
             settings.htf_ema_slow,
             settings.htf_swing_lookback,
             settings.htf_ema_flat_ratio,
+            settings.htf_allow_pullback_bias,
         )
         self.htf_bias = bias
         self.htf_context = context
@@ -922,3 +923,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
+

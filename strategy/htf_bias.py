@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
+
 def ema(values: List[float], length: int) -> float:
     if not values:
         return 0.0
@@ -32,6 +33,7 @@ def classify_bias(
     ema_slow: int,
     swing_lookback: int,
     flat_ratio: float,
+    allow_pullback_bias: bool,
 ) -> tuple[str, dict]:
     if len(candles) < max(ema_slow, swing_lookback * 2):
         return "NEUTRAL", {}
@@ -46,11 +48,11 @@ def classify_bias(
     lower_low_break = prev_low > 0 and recent_low < prev_low
     higher_high_break = prev_high > 0 and recent_high > prev_high
 
-    bias = "NEUTRAL"
     ema_separation = abs(ema_fast_val - ema_slow_val) / ema_slow_val if ema_slow_val > 0 else 0.0
     between_emas = min(ema_fast_val, ema_slow_val) <= last_close <= max(ema_fast_val, ema_slow_val)
-    tangled = ema_separation < flat_ratio or between_emas
+    tangled = ema_separation < flat_ratio or (between_emas and not allow_pullback_bias)
 
+    bias = "NEUTRAL"
     if (not tangled) and last_close > ema_slow_val and ema_fast_val > ema_slow_val and not lower_low_break:
         bias = "BULLISH"
     elif (not tangled) and last_close < ema_slow_val and ema_fast_val < ema_slow_val and not higher_high_break:
@@ -67,6 +69,8 @@ def classify_bias(
         "lower_low_break": lower_low_break,
         "higher_high_break": higher_high_break,
         "ema_separation": ema_separation,
+        "between_emas": between_emas,
         "tangled": tangled,
+        "allow_pullback_bias": allow_pullback_bias,
     }
     return bias, context

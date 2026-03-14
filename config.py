@@ -31,6 +31,7 @@ class Settings:
     htf_ema_fast: int = int(os.getenv("BOT_HTF_EMA_FAST", "20"))
     htf_ema_slow: int = int(os.getenv("BOT_HTF_EMA_SLOW", "50"))
     htf_ema_flat_ratio: float = float(os.getenv("BOT_HTF_EMA_FLAT_RATIO", "0.0005"))
+    htf_allow_pullback_bias: bool = os.getenv("BOT_HTF_ALLOW_PULLBACK_BIAS", "false").lower() == "true"
     htf_swing_lookback: int = int(os.getenv("BOT_HTF_SWING_LOOKBACK", "12"))
     setup_swing_lookback: int = int(os.getenv("BOT_SETUP_SWING_LOOKBACK", "16"))
     setup_zone_buffer_mult: float = float(os.getenv("BOT_SETUP_ZONE_BUFFER_MULT", "0.35"))
@@ -142,3 +143,4 @@ class Settings:
 
 
 settings = Settings()
+
