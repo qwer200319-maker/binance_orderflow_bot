@@ -50,7 +50,10 @@ def classify_bias(
 
     ema_separation = abs(ema_fast_val - ema_slow_val) / ema_slow_val if ema_slow_val > 0 else 0.0
     between_emas = min(ema_fast_val, ema_slow_val) <= last_close <= max(ema_fast_val, ema_slow_val)
-    tangled = ema_separation < flat_ratio or (between_emas and not allow_pullback_bias)
+    if allow_pullback_bias:
+        tangled = ema_separation < flat_ratio
+    else:
+        tangled = ema_separation < flat_ratio and between_emas
 
     bias = "NEUTRAL"
     if (not tangled) and last_close > ema_slow_val and ema_fast_val > ema_slow_val and not lower_low_break:
@@ -74,3 +77,4 @@ def classify_bias(
         "allow_pullback_bias": allow_pullback_bias,
     }
     return bias, context
+
