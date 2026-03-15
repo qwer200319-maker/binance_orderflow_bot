@@ -411,7 +411,8 @@ window.addEventListener("resize", () => drawChart());
 fetchChart();
 pollState();
 connectStream();
-initExpanders();\ninitCandleTimer();
+initExpanders();
+initCandleTimer();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -420,6 +421,7 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
 
 
 
