@@ -1,5 +1,5 @@
-console.info("Orderflow UI v23 loaded");
-const UI_VERSION = "v23";
+console.info("Orderflow UI v24 loaded");
+const UI_VERSION = "v24";
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 const CANDLE_FETCH_TIMEOUT_MS = 8000;
 
@@ -217,6 +217,9 @@ const candleState = {
 
 let candleChart;
 let candleSeries;
+let fallbackCanvas;
+let fallbackCtx;
+let fallbackData = [];
 
 function tfToMs(tf) {
   switch (tf) {
@@ -265,10 +268,93 @@ function setCandleFallback(message) {
   }
 }
 
+function ensureFallbackCanvas() {
+  if (!els.candlesChart) return;
+  if (!fallbackCanvas) {
+    fallbackCanvas = document.createElement("canvas");
+    fallbackCanvas.className = "candles-fallback-canvas";
+    els.candlesChart.appendChild(fallbackCanvas);
+    fallbackCtx = fallbackCanvas.getContext("2d");
+  }
+  resizeFallbackCanvas();
+}
+
+function resizeFallbackCanvas() {
+  if (!fallbackCanvas || !els.candlesChart) return;
+  const { width, height } = els.candlesChart.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  fallbackCanvas.width = width * dpr;
+  fallbackCanvas.height = height * dpr;
+  fallbackCanvas.style.width = `${width}px`;
+  fallbackCanvas.style.height = `${height}px`;
+  if (fallbackCtx) {
+    fallbackCtx.setTransform(1, 0, 0, 1, 0, 0);
+    fallbackCtx.scale(dpr, dpr);
+  }
+  drawFallbackCandles();
+}
+
+function drawFallbackCandles() {
+  if (!fallbackCtx || !fallbackData.length || !fallbackCanvas) return;
+  const { width, height } = fallbackCanvas.getBoundingClientRect();
+  fallbackCtx.clearRect(0, 0, width, height);
+
+  const padding = 12;
+  const lows = fallbackData.map((c) => c.low);
+  const highs = fallbackData.map((c) => c.high);
+  let min = Math.min(...lows);
+  let max = Math.max(...highs);
+  if (min === max) {
+    min -= 1;
+    max += 1;
+  }
+  const range = max - min;
+  min -= range * 0.05;
+  max += range * 0.05;
+
+  const candleCount = fallbackData.length;
+  const plotWidth = width - padding * 2;
+  const plotHeight = height - padding * 2;
+  const step = plotWidth / Math.max(1, candleCount);
+  const bodyWidth = Math.max(2, step * 0.6);
+
+  const scaleY = (price) => padding + ((max - price) / (max - min)) * plotHeight;
+
+  fallbackData.forEach((candle, idx) => {
+    const x = padding + idx * step + step / 2;
+    const openY = scaleY(candle.open);
+    const closeY = scaleY(candle.close);
+    const highY = scaleY(candle.high);
+    const lowY = scaleY(candle.low);
+    const up = candle.close >= candle.open;
+    const color = up ? "#1f8a5b" : "#c14a4a";
+
+    fallbackCtx.strokeStyle = color;
+    fallbackCtx.lineWidth = 1;
+    fallbackCtx.beginPath();
+    fallbackCtx.moveTo(x, highY);
+    fallbackCtx.lineTo(x, lowY);
+    fallbackCtx.stroke();
+
+    const bodyTop = up ? closeY : openY;
+    const bodyBottom = up ? openY : closeY;
+    const bodyHeight = Math.max(1, bodyBottom - bodyTop);
+    fallbackCtx.fillStyle = color;
+    fallbackCtx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+  });
+}
+
 function initCandlesChart() {
   if (!els.candlesChart) return;
   if (!window.LightweightCharts) {
-    setCandleFallback("Chart library failed to load.");
+    ensureFallbackCanvas();
+    candleSeries = {
+      setData: (data) => {
+        fallbackData = Array.isArray(data) ? data : [];
+        drawFallbackCandles();
+      },
+    };
+    setCandleFallback("");
     return;
   }
   candleChart = LightweightCharts.createChart(els.candlesChart, {
@@ -300,9 +386,11 @@ function initCandlesChart() {
 }
 
 function resizeCandleChart() {
-  if (!candleChart || !els.candlesChart) return;
-  const { width, height } = els.candlesChart.getBoundingClientRect();
-  candleChart.resize(width, height);
+  if (candleChart && els.candlesChart) {
+    const { width, height } = els.candlesChart.getBoundingClientRect();
+    candleChart.resize(width, height);
+  }
+  resizeFallbackCanvas();
 }
 
 async function fetchCandles() {
