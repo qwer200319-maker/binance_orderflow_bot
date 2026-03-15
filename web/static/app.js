@@ -1,6 +1,7 @@
-console.info("Orderflow UI v22 loaded");
-const UI_VERSION = "v22";
+console.info("Orderflow UI v23 loaded");
+const UI_VERSION = "v23";
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
+const CANDLE_FETCH_TIMEOUT_MS = 8000;
 
 const params = new URLSearchParams(window.location.search);
 const apiParam = params.get("api");
@@ -10,6 +11,7 @@ API_BASE = API_BASE.replace(/\/$/, "");
 if (apiParam) {
   window.localStorage.setItem("apiBase", API_BASE);
 }
+console.info("API_BASE", API_BASE);
 
 const els = {
   botStatus: document.getElementById("botStatus"),
@@ -308,10 +310,13 @@ async function fetchCandles() {
     setCandleFallback("Chart not initialized.");
     return;
   }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CANDLE_FETCH_TIMEOUT_MS);
   try {
     setCandleFallback("Loading candles…");
     const res = await fetch(
-      `${API_BASE}/api/candles?interval=${candleState.tf}&limit=200`
+      `${API_BASE}/api/candles?interval=${candleState.tf}&limit=200`,
+      { signal: controller.signal, cache: "no-store" }
     );
     if (!res.ok) {
       throw new Error(`candles ${res.status}`);
@@ -325,8 +330,14 @@ async function fetchCandles() {
       setCandleFallback("No candle data yet.");
     }
   } catch (err) {
-    console.warn("candles fetch failed", err);
-    setCandleFallback("Candle API unavailable.");
+    if (err && err.name === "AbortError") {
+      setCandleFallback("Candle API timeout.");
+    } else {
+      console.warn("candles fetch failed", err);
+      setCandleFallback("Candle API unavailable.");
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
