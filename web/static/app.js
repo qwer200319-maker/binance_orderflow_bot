@@ -41,6 +41,12 @@ const els = {
   cooldownRemaining: document.getElementById("cooldownRemaining"),
   signalsList: document.getElementById("signalsList"),
   logsList: document.getElementById("logsList"),
+  nextClose: document.getElementById("nextClose"),
+  closeCountdown: document.getElementById("closeCountdown"),
+  candleTabs: document.getElementById("candleTabs"),
+  chartFullscreen: document.getElementById("chartFullscreen"),
+  candlesChart: document.getElementById("candlesChart"),
+  chartPanel: document.getElementById("chartPanel"),
 };
 
 const chartState = {
