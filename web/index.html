@@ -223,7 +223,30 @@
             </div>
             <button class="icon-btn" type="button" data-toggle="expand" data-target="#logsPanel" aria-expanded="false">ពង្រីក</button>
           </div>
-          <div class="candle-tools">
+          <div class="panel-sub">Recent signals</div>
+          <div class="list" id="signalsList"></div>
+          <div class="panel-sub">Logs</div>
+          <div class="list" id="logsList"></div>
+        </div>
+
+        <div class="card span-7 chart-card" id="chartPanel" style="--i: 6">
+          <div class="card-title with-action">
+            <div class="title-left">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19h16" />
+                  <path d="M5 15l4-4 4 3 6-7" />
+                </svg>
+              </span>
+              Chart Panel
+            </div>
+            <button class="icon-btn" type="button" id="chartFullscreen">Full Screen</button>
+          </div>
+          <div class="chart-toolbar">
+            <div class="exchange-tabs" id="exchangeTabs">
+              <button class="tab active" type="button" data-exchange="BINANCE">Binance</button>
+              <button class="tab" type="button" data-exchange="OKX">OKX</button>
+            </div>
             <div class="candle-tabs" id="candleTabs">
               <button class="tab active" type="button" data-tf="1m">1m</button>
               <button class="tab" type="button" data-tf="15m">15m</button>
@@ -237,33 +260,12 @@
               <div class="candle-countdown" id="closeCountdown">--</div>
             </div>
           </div>
-          <div class="panel-sub">Recent signals</div>
-          <div class="list" id="signalsList"></div>
-          <div class="panel-sub">Logs</div>
-          <div class="list" id="logsList"></div>
-        </div>
-
-        <div class="card span-7 chart-card" style="--i: 6">
-          <div class="card-title">
-            <span class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19h16" />
-                <path d="M5 15l4-4 4 3 6-7" />
-              </svg>
-            </span>
-            Chart Panel
-          </div>
-          <div class="chart-meta">
-            <span>Price chart</span>
-            <span>VWAP • Swing levels • Entry/SL/TP</span>
-          </div>
           <div class="chart-wrap">
-            <canvas id="priceChart"></canvas>
+            <div id="tvChart" class="tv-chart"></div>
           </div>
         </div>
       </section>
     </div>
   </body>
 </html>
-
 

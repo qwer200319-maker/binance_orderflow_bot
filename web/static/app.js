@@ -192,6 +192,12 @@ const candleState = {
   timerId: null,
 };
 
+const chartConfig = {
+  exchange: "BINANCE",
+  symbol: "BTCUSDT",
+  interval: "1",
+};
+
 function tfToMs(tf) {
   switch (tf) {
     case "1m":
@@ -207,6 +213,64 @@ function tfToMs(tf) {
     default:
       return 60 * 1000;
   }
+}
+
+function tvIntervalFromTf(tf) {
+  switch (tf) {
+    case "1m":
+      return "1";
+    case "15m":
+      return "15";
+    case "1h":
+      return "60";
+    case "4h":
+      return "240";
+    case "1d":
+      return "D";
+    default:
+      return "1";
+  }
+}
+
+function tvSymbolFromExchange(exchange) {
+  const map = {
+    BINANCE: "BINANCE:BTCUSDT",
+    OKX: "OKX:BTCUSDT",
+  };
+  return map[exchange] || map.BINANCE;
+}
+
+function renderTradingViewChart() {
+  if (!els.tvChart) return;
+  const symbol = tvSymbolFromExchange(chartConfig.exchange);
+  const interval = chartConfig.interval;
+  els.tvChart.innerHTML = "";
+  const container = document.createElement("div");
+  container.className = "tradingview-widget-container";
+  const widget = document.createElement("div");
+  widget.className = "tradingview-widget-container__widget";
+  container.appendChild(widget);
+  const script = document.createElement("script");
+  script.type = "text/javascript";
+  script.async = true;
+  script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+  script.text = JSON.stringify({
+    autosize: true,
+    symbol,
+    interval,
+    timezone: "Etc/UTC",
+    theme: "light",
+    style: "1",
+    locale: "en",
+    allow_symbol_change: false,
+    hide_legend: false,
+    hide_top_toolbar: false,
+    save_image: false,
+    withdateranges: true,
+    support_host: "https://www.tradingview.com",
+  });
+  container.appendChild(script);
+  els.tvChart.appendChild(container);
 }
 
 function formatCountdown(ms) {
@@ -229,24 +293,67 @@ function updateCandleTimer() {
   els.closeCountdown.textContent = formatCountdown(diff);
 }
 
+function setTimeframe(tf) {
+  candleState.tf = tf;
+  candleState.tfMs = tfToMs(tf);
+  chartConfig.interval = tvIntervalFromTf(tf);
+  updateCandleTimer();
+  renderTradingViewChart();
+}
+
 function initCandleTimer() {
   if (!els.candleTabs) return;
   els.candleTabs.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       const tf = btn.getAttribute("data-tf") || "1m";
-      candleState.tf = tf;
-      candleState.tfMs = tfToMs(tf);
       els.candleTabs.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      updateCandleTimer();
+      setTimeframe(tf);
     });
   });
   if (candleState.timerId) clearInterval(candleState.timerId);
   candleState.timerId = setInterval(updateCandleTimer, 1000);
-  updateCandleTimer();
+  setTimeframe(candleState.tf);
 }
 
-function updateChartFromState(state) {
+function initExchangeTabs() {
+  if (!els.exchangeTabs) return;
+  els.exchangeTabs.querySelectorAll(".tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const exchange = btn.getAttribute("data-exchange") || "BINANCE";
+      chartConfig.exchange = exchange;
+      els.exchangeTabs.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderTradingViewChart();
+    });
+  });
+}
+
+function initChartFullscreen() {
+  if (!els.chartFullscreen || !els.chartPanel) return;
+  const btn = els.chartFullscreen;
+  btn.addEventListener("click", () => {
+    if (!document.fullscreenElement) {
+      if (els.chartPanel.requestFullscreen) {
+        els.chartPanel.requestFullscreen();
+      }
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    const isFull = Boolean(document.fullscreenElement);
+    btn.textContent = isFull ? "ចេញពីពេញអេក្រង់" : "ពេញអេក្រង់";
+  });
+}
+
+function initTradingView() {
+  initExchangeTabs();
+  initCandleTimer();
+  initChartFullscreen();
+}
+
+function updateChartFromState(state) {(state) {
   const price = state.price;
   if (!price) return;
   const ts = Date.parse(state.ts) / 1000;
@@ -394,7 +501,7 @@ function connectStream() {
 }
 
 function initExpanders() {
-  document.querySelectorAll("[data-toggle=''expand'']").forEach((btn) => {
+  document.querySelectorAll("[data-toggle=\"expand\"]").forEach((btn) => {
     const targetSel = btn.getAttribute("data-target");
     const target = targetSel ? document.querySelector(targetSel) : null;
     if (!target) return;
@@ -412,7 +519,7 @@ fetchChart();
 pollState();
 connectStream();
 initExpanders();
-initCandleTimer();
+initTradingView();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -421,6 +528,15 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+
+
+
+
+
+
+
+
 
 
 
