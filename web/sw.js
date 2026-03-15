@@ -1,6 +1,5 @@
-const CACHE_NAME = "orderflow-ui-v17";
+const CACHE_NAME = "orderflow-ui-v18";
 const STATIC_ASSETS = [
-  "/",
   "/manifest.json",
   "/static/styles.css?v=16",
   "/static/app.js?v=16",
@@ -15,6 +14,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -27,10 +27,15 @@ self.addEventListener("activate", (event) => {
       )
     )
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -46,18 +51,3 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
