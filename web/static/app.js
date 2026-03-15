@@ -1,4 +1,5 @@
-console.info("Orderflow UI v18 loaded");
+console.info("Orderflow UI v20 loaded");
+const UI_VERSION = "v20";
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 
 const params = new URLSearchParams(window.location.search);
@@ -13,6 +14,7 @@ if (apiParam) {
 const els = {
   botStatus: document.getElementById("botStatus"),
   lastUpdate: document.getElementById("lastUpdate"),
+  uiVersion: document.getElementById("uiVersion"),
   symbol: document.getElementById("symbol"),
   price: document.getElementById("price"),
   currentSignal: document.getElementById("currentSignal"),
@@ -92,53 +94,60 @@ function updatePanel(state) {
   const symbol = state.symbol || "--";
   const price = state.price;
 
-  els.symbol.textContent = symbol;
-  els.price.textContent = formatNumber(price, 2);
-  els.currentSignal.textContent = state.signal_current || "--";
-  els.qualityScore.textContent = state.quality_score
-    ? `${state.quality_score} ${state.quality_grade || ""}`.trim()
-    : "--";
+  if (els.symbol) els.symbol.textContent = symbol;
+  if (els.price) els.price.textContent = formatNumber(price, 2);
+  if (els.currentSignal) els.currentSignal.textContent = state.signal_current || "--";
+  if (els.qualityScore) {
+    els.qualityScore.textContent = state.quality_score
+      ? `${state.quality_score} ${state.quality_grade || ""}`.trim()
+      : "--";
+  }
 
-  els.marketSymbol.textContent = symbol;
-  els.marketPrice.textContent = formatNumber(price, 2);
-  els.htfBias.textContent = state.htf_bias || "--";
-  els.setupSignal.textContent = state.setup_signal || "--";
-  els.marketRegime.textContent = state.market_regime || "--";
+  if (els.marketSymbol) els.marketSymbol.textContent = symbol;
+  if (els.marketPrice) els.marketPrice.textContent = formatNumber(price, 2);
+  if (els.htfBias) els.htfBias.textContent = state.htf_bias || "--";
+  if (els.setupSignal) els.setupSignal.textContent = state.setup_signal || "--";
+  if (els.marketRegime) els.marketRegime.textContent = state.market_regime || "--";
+
   const volValue =
     state.volatility_value !== null && state.volatility_value !== undefined
       ? formatNumber(state.volatility_value, 4)
       : "--";
-  els.volatility.textContent = `${state.volatility_state || "--"} (${volValue})`;
+  if (els.volatility) {
+    els.volatility.textContent = `${state.volatility_state || "--"} (${volValue})`;
+  }
 
-  els.signalCurrent.textContent = state.signal_current || "--";
-  els.signalQuality.textContent = state.quality_score
-    ? `${state.quality_score} ${state.quality_grade || ""}`.trim()
-    : "--";
-  els.signalEntry.textContent = formatNumber(state.entry, 2);
-  els.signalSL.textContent = formatNumber(state.sl, 2);
-  els.signalTP1.textContent = formatNumber(state.tp1, 2);
-  els.signalTP2.textContent = formatNumber(state.tp2, 2);
+  if (els.signalCurrent) els.signalCurrent.textContent = state.signal_current || "--";
+  if (els.signalQuality) {
+    els.signalQuality.textContent = state.quality_score
+      ? `${state.quality_score} ${state.quality_grade || ""}`.trim()
+      : "--";
+  }
+  if (els.signalEntry) els.signalEntry.textContent = formatNumber(state.entry, 2);
+  if (els.signalSL) els.signalSL.textContent = formatNumber(state.sl, 2);
+  if (els.signalTP1) els.signalTP1.textContent = formatNumber(state.tp1, 2);
+  if (els.signalTP2) els.signalTP2.textContent = formatNumber(state.tp2, 2);
 
-  els.delta5s.textContent = formatSigned(state.delta_5s, 2);
-  els.delta15s.textContent = formatSigned(state.delta_15s, 2);
-  els.imbalance.textContent = formatNumber(state.imbalance, 4);
+  if (els.delta5s) els.delta5s.textContent = formatSigned(state.delta_5s, 2);
+  if (els.delta15s) els.delta15s.textContent = formatSigned(state.delta_15s, 2);
+  if (els.imbalance) els.imbalance.textContent = formatNumber(state.imbalance, 4);
 
   let absorption = "NONE";
   if (state.bullish_absorption) absorption = "BULLISH";
   if (state.bearish_absorption) absorption = "BEARISH";
-  els.absorption.textContent = absorption;
+  if (els.absorption) els.absorption.textContent = absorption;
 
   const liq = [];
   if (state.active_buy_liq_cluster) liq.push("ACTIVE BUY");
   if (state.active_sell_liq_cluster) liq.push("ACTIVE SELL");
   if (state.recent_buy_liq_cluster) liq.push("RECENT BUY");
   if (state.recent_sell_liq_cluster) liq.push("RECENT SELL");
-  els.liquidations.textContent = liq.length ? liq.join(" • ") : "NONE";
+  if (els.liquidations) els.liquidations.textContent = liq.length ? liq.join(" • ") : "NONE";
 
   let sweep = "NONE";
   if (state.bullish_sweep) sweep = "BULLISH";
   if (state.bearish_sweep) sweep = "BEARISH";
-  els.liquiditySweep.textContent = sweep;
+  if (els.liquiditySweep) els.liquiditySweep.textContent = sweep;
 
   const vwapFlags = [];
   if (state.vwap_reclaim) vwapFlags.push("RECLAIM");
@@ -146,28 +155,32 @@ function updatePanel(state) {
   const vwapContext = `${state.vwap_state || "--"}${
     vwapFlags.length ? ` (${vwapFlags.join(", ")})` : ""
   }`;
-  els.vwapContext.textContent = vwapContext;
-  els.vwapValue.textContent = formatNumber(state.vwap, 2);
+  if (els.vwapContext) els.vwapContext.textContent = vwapContext;
+  if (els.vwapValue) els.vwapValue.textContent = formatNumber(state.vwap, 2);
 
   const running = Boolean(state.running);
-  els.botRunning.textContent = running ? "RUNNING" : "STOPPED";
-  els.botStatus.textContent = running ? "RUNNING" : "STOPPED";
-  els.botStatus.classList.toggle("warn", !running);
-  els.lastUpdate.textContent = `Last update ${formatTime(state.ts)}`;
-  els.lastSignalTime.textContent = formatDateTime(state.last_signal_time);
+  if (els.botRunning) els.botRunning.textContent = running ? "RUNNING" : "STOPPED";
+  if (els.botStatus) {
+    els.botStatus.textContent = running ? "RUNNING" : "STOPPED";
+    els.botStatus.classList.toggle("warn", !running);
+  }
+  if (els.lastUpdate) els.lastUpdate.textContent = `Last update ${formatTime(state.ts)}`;
+  if (els.lastSignalTime) els.lastSignalTime.textContent = formatDateTime(state.last_signal_time);
 
   const cooldownRemaining = state.cooldown_remaining || 0;
-  if (cooldownRemaining > 0) {
-    els.cooldownRemaining.textContent = `${Math.ceil(cooldownRemaining)}s remaining`;
-  } else {
-    els.cooldownRemaining.textContent = "Ready";
+  if (els.cooldownRemaining) {
+    if (cooldownRemaining > 0) {
+      els.cooldownRemaining.textContent = `${Math.ceil(cooldownRemaining)}s remaining`;
+    } else {
+      els.cooldownRemaining.textContent = "Ready";
+    }
   }
 
   updateLists(state);
 }
 
 function updateLists(state) {
-  if (state.signals) {
+  if (state.signals && els.signalsList) {
     els.signalsList.innerHTML = state.signals
       .slice()
       .reverse()
@@ -181,7 +194,7 @@ function updateLists(state) {
       .join("");
   }
 
-  if (state.logs) {
+  if (state.logs && els.logsList) {
     els.logsList.innerHTML = state.logs
       .slice()
       .reverse()
@@ -290,9 +303,18 @@ async function fetchCandles() {
   }
 }
 
+function setActiveTimeframe(tf) {
+  if (!els.candleTabs) return;
+  els.candleTabs.querySelectorAll(".tab").forEach((btn) => {
+    const isActive = btn.getAttribute("data-tf") === tf;
+    btn.classList.toggle("active", isActive);
+  });
+}
+
 function setTimeframe(tf) {
   candleState.tf = tf;
   candleState.tfMs = tfToMs(tf);
+  setActiveTimeframe(tf);
   updateCandleTimer();
   fetchCandles();
 }
@@ -302,8 +324,6 @@ function initCandleTimer() {
   els.candleTabs.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       const tf = btn.getAttribute("data-tf") || "1m";
-      els.candleTabs.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
       setTimeframe(tf);
     });
   });
@@ -312,17 +332,22 @@ function initCandleTimer() {
   setTimeframe(candleState.tf);
 }
 
+function toggleChartFullscreen() {
+  if (!els.chartPanel) return;
+  if (!document.fullscreenElement) {
+    if (els.chartPanel.requestFullscreen) {
+      els.chartPanel.requestFullscreen();
+    }
+  } else if (document.exitFullscreen) {
+    document.exitFullscreen();
+  }
+}
+
 function initChartFullscreen() {
   if (!els.chartFullscreen || !els.chartPanel) return;
   const btn = els.chartFullscreen;
   btn.addEventListener("click", () => {
-    if (!document.fullscreenElement) {
-      if (els.chartPanel.requestFullscreen) {
-        els.chartPanel.requestFullscreen();
-      }
-    } else if (document.exitFullscreen) {
-      document.exitFullscreen();
-    }
+    toggleChartFullscreen();
   });
   document.addEventListener("fullscreenchange", () => {
     const isFull = Boolean(document.fullscreenElement);
@@ -332,11 +357,15 @@ function initChartFullscreen() {
 }
 
 function initCandlesView() {
+  window.__setTF = setTimeframe;
+  window.__toggleFull = toggleChartFullscreen;
+  if (els.uiVersion) els.uiVersion.textContent = `UI ${UI_VERSION}`;
   initCandlesChart();
   initCandleTimer();
   initChartFullscreen();
   fetchCandles();
 }
+
 function updateChartFromState(state) {
   const price = state.price;
   if (!price) return;
@@ -497,7 +526,10 @@ function initExpanders() {
   });
 }
 
-window.addEventListener("resize", () => { drawChart(); resizeCandleChart(); });
+window.addEventListener("resize", () => {
+  drawChart();
+  resizeCandleChart();
+});
 
 fetchChart();
 pollState();
@@ -512,37 +544,3 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
