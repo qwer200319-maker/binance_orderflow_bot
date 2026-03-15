@@ -1,5 +1,5 @@
-console.info("Orderflow UI v20 loaded");
-const UI_VERSION = "v20";
+console.info("Orderflow UI v21 loaded");
+const UI_VERSION = "v21";
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 
 const params = new URLSearchParams(window.location.search);
@@ -49,6 +49,7 @@ const els = {
   candleTabs: document.getElementById("candleTabs"),
   chartFullscreen: document.getElementById("chartFullscreen"),
   candlesChart: document.getElementById("candlesChart"),
+  candleFallback: document.getElementById("candleFallback"),
   chartPanel: document.getElementById("chartPanel"),
 };
 
@@ -252,8 +253,22 @@ function updateCandleTimer() {
   els.closeCountdown.textContent = formatCountdown(diff);
 }
 
+function setCandleFallback(message) {
+  if (!els.candleFallback) return;
+  if (message) {
+    els.candleFallback.textContent = message;
+    els.candleFallback.style.display = "flex";
+  } else {
+    els.candleFallback.style.display = "none";
+  }
+}
+
 function initCandlesChart() {
-  if (!els.candlesChart || !window.LightweightCharts) return;
+  if (!els.candlesChart) return;
+  if (!window.LightweightCharts) {
+    setCandleFallback("Chart library failed to load.");
+    return;
+  }
   candleChart = LightweightCharts.createChart(els.candlesChart, {
     layout: {
       background: { color: "#f7f9fc" },
@@ -269,7 +284,7 @@ function initCandlesChart() {
       secondsVisible: false,
     },
     rightPriceScale: {
-      borderColor: "rgba(15, 23, 34, 0.2)",
+      borderColor: "rgba(15, 23, 34, 0.2)" ,
     },
   });
   candleSeries = candleChart.addCandlestickSeries({
@@ -291,15 +306,23 @@ function resizeCandleChart() {
 async function fetchCandles() {
   if (!candleSeries) return;
   try {
+    setCandleFallback("Loading candles…");
     const res = await fetch(
       `${API_BASE}/api/candles?interval=${candleState.tf}&limit=200`
     );
+    if (!res.ok) {
+      throw new Error(`candles ${res.status}`);
+    }
     const data = await res.json();
-    if (data.candles) {
+    if (data.candles && data.candles.length) {
       candleSeries.setData(data.candles);
+      setCandleFallback("");
+    } else {
+      setCandleFallback("No candle data yet.");
     }
   } catch (err) {
     console.warn("candles fetch failed", err);
+    setCandleFallback("Candle API unavailable.");
   }
 }
 
