@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import BotApp
 from config import settings
+from feeds.exchange_candles import fetch_binance_candles
 from utils.time_utils import iso_utc, now_ts
 
 
