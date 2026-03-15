@@ -121,17 +121,17 @@ if STATIC_DIR.exists():
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/manifest.json")
 async def manifest() -> FileResponse:
-    return FileResponse(WEB_DIR / "manifest.json")
+    return FileResponse(WEB_DIR / "manifest.json", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/sw.js")
 async def service_worker() -> FileResponse:
-    return FileResponse(WEB_DIR / "sw.js")
+    return FileResponse(WEB_DIR / "sw.js", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/health")
@@ -216,6 +216,7 @@ if __name__ == "__main__":
 
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+
 
 
 

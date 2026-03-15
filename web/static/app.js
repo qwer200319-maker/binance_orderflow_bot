@@ -1,3 +1,4 @@
+console.info("Orderflow UI v18 loaded");
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 
 const params = new URLSearchParams(window.location.search);
@@ -511,6 +512,8 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+
 
 
 
