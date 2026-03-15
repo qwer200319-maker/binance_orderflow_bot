@@ -1,8 +1,8 @@
-const CACHE_NAME = "orderflow-ui-v22";
+const CACHE_NAME = "orderflow-ui-v23";
 const STATIC_ASSETS = [
   "/manifest.json",
-  "/static/styles.css?v=21",
-  "/static/app.js?v=21",
+  "/static/styles.css?v=22",
+  "/static/app.js?v=22",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/icon-180.png",
@@ -51,6 +51,7 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
 
 
 

@@ -1,5 +1,5 @@
-console.info("Orderflow UI v21 loaded");
-const UI_VERSION = "v21";
+console.info("Orderflow UI v22 loaded");
+const UI_VERSION = "v22";
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 
 const params = new URLSearchParams(window.location.search);
@@ -284,7 +284,7 @@ function initCandlesChart() {
       secondsVisible: false,
     },
     rightPriceScale: {
-      borderColor: "rgba(15, 23, 34, 0.2)" ,
+      borderColor: "rgba(15, 23, 34, 0.2)",
     },
   });
   candleSeries = candleChart.addCandlestickSeries({
@@ -304,7 +304,10 @@ function resizeCandleChart() {
 }
 
 async function fetchCandles() {
-  if (!candleSeries) return;
+  if (!candleSeries) {
+    setCandleFallback("Chart not initialized.");
+    return;
+  }
   try {
     setCandleFallback("Loading candles…");
     const res = await fetch(
@@ -316,6 +319,7 @@ async function fetchCandles() {
     const data = await res.json();
     if (data.candles && data.candles.length) {
       candleSeries.setData(data.candles);
+      if (candleChart) candleChart.timeScale().fitContent();
       setCandleFallback("");
     } else {
       setCandleFallback("No candle data yet.");
@@ -383,6 +387,7 @@ function initCandlesView() {
   window.__setTF = setTimeframe;
   window.__toggleFull = toggleChartFullscreen;
   if (els.uiVersion) els.uiVersion.textContent = `UI ${UI_VERSION}`;
+  setCandleFallback("Loading candles…");
   initCandlesChart();
   initCandleTimer();
   initChartFullscreen();
