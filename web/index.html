@@ -19,8 +19,8 @@
     <div class="app">
       <header class="topbar">
         <div class="brand">
-          <div class="brand-title">PSN Strategy</div>
-          <!-- <div class="brand-sub">Professional Trading Terminal</div> -->
+          <div class="brand-title">Orderflow Bot</div>
+          <div class="brand-sub">Professional Trading Terminal</div>
         </div>
         <div class="top-status">
           <div class="pill" id="botStatus">BOOTING</div>
@@ -208,17 +208,34 @@
           </div>
         </div>
 
-        <div class="card span-5" style="--i: 5">
-          <div class="card-title">
-            <span class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 6h10" />
-                <path d="M4 12h16" />
-                <path d="M4 18h13" />
-                <circle cx="19" cy="6" r="1.5" />
-              </svg>
-            </span>
-            Logs Panel
+        <div class="card span-5 expandable" id="logsPanel" style="--i: 5">
+          <div class="card-title with-action">
+            <div class="title-left">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 6h10" />
+                  <path d="M4 12h16" />
+                  <path d="M4 18h13" />
+                  <circle cx="19" cy="6" r="1.5" />
+                </svg>
+              </span>
+              Logs Panel
+            </div>
+            <button class="icon-btn" type="button" data-toggle="expand" data-target="#logsPanel" aria-expanded="false">ពង្រីក</button>
+          </div>
+          <div class="candle-tools">
+            <div class="candle-tabs" id="candleTabs">
+              <button class="tab active" type="button" data-tf="1m">1m</button>
+              <button class="tab" type="button" data-tf="15m">15m</button>
+              <button class="tab" type="button" data-tf="1h">1h</button>
+              <button class="tab" type="button" data-tf="4h">4h</button>
+              <button class="tab" type="button" data-tf="1d">1d</button>
+            </div>
+            <div class="candle-meta">
+              <div class="candle-label">Next close</div>
+              <div class="candle-value" id="nextClose">--</div>
+              <div class="candle-countdown" id="closeCountdown">--</div>
+            </div>
           </div>
           <div class="panel-sub">Recent signals</div>
           <div class="list" id="signalsList"></div>
@@ -248,3 +265,4 @@
     </div>
   </body>
 </html>
+

@@ -186,6 +186,66 @@ function updateLists(state) {
   }
 }
 
+const candleState = {
+  tf: "1m",
+  tfMs: 60 * 1000,
+  timerId: null,
+};
+
+function tfToMs(tf) {
+  switch (tf) {
+    case "1m":
+      return 60 * 1000;
+    case "15m":
+      return 15 * 60 * 1000;
+    case "1h":
+      return 60 * 60 * 1000;
+    case "4h":
+      return 4 * 60 * 60 * 1000;
+    case "1d":
+      return 24 * 60 * 60 * 1000;
+    default:
+      return 60 * 1000;
+  }
+}
+
+function formatCountdown(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (v) => String(v).padStart(2, "0");
+  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
+}
+
+function updateCandleTimer() {
+  if (!els.nextClose || !els.closeCountdown) return;
+  const now = Date.now();
+  const tfMs = candleState.tfMs;
+  const next = Math.ceil(now / tfMs) * tfMs;
+  const diff = next - now;
+  els.nextClose.textContent = new Date(next).toLocaleTimeString();
+  els.closeCountdown.textContent = formatCountdown(diff);
+}
+
+function initCandleTimer() {
+  if (!els.candleTabs) return;
+  els.candleTabs.querySelectorAll(".tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tf = btn.getAttribute("data-tf") || "1m";
+      candleState.tf = tf;
+      candleState.tfMs = tfToMs(tf);
+      els.candleTabs.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      updateCandleTimer();
+    });
+  });
+  if (candleState.timerId) clearInterval(candleState.timerId);
+  candleState.timerId = setInterval(updateCandleTimer, 1000);
+  updateCandleTimer();
+}
+
 function updateChartFromState(state) {
   const price = state.price;
   if (!price) return;
@@ -333,11 +393,25 @@ function connectStream() {
   };
 }
 
+function initExpanders() {
+  document.querySelectorAll("[data-toggle=''expand'']").forEach((btn) => {
+    const targetSel = btn.getAttribute("data-target");
+    const target = targetSel ? document.querySelector(targetSel) : null;
+    if (!target) return;
+    btn.addEventListener("click", () => {
+      const expanded = target.classList.toggle("expanded");
+      btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      btn.textContent = expanded ? "ពង្រួម" : "ពង្រីក";
+    });
+  });
+}
+
 window.addEventListener("resize", () => drawChart());
 
 fetchChart();
 pollState();
 connectStream();
+initExpanders();\ninitCandleTimer();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -346,5 +420,7 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+
 
 

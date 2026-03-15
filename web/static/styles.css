@@ -233,6 +233,40 @@ body {
   gap: 8px;
 }
 
+.card-title.with-action {
+  justify-content: space-between;
+}
+
+.card-title .title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  border: 1px solid rgba(12, 124, 136, 0.35);
+  background: rgba(12, 124, 136, 0.12);
+  color: var(--accent);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: rgba(12, 124, 136, 0.2);
+}
+
+.card.expandable.expanded {
+  grid-column: span 12;
+}
+
+.card.expandable.expanded .list {
+  max-height: 420px;
+}
+
 .card-icon {
   display: inline-flex;
   align-items: center;
@@ -276,6 +310,68 @@ body {
   color: var(--muted);
   margin-top: 6px;
   margin-bottom: 8px;
+}
+
+.candle-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 34, 0.12);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.candle-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  border: 1px solid rgba(15, 23, 34, 0.15);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: rgba(12, 124, 136, 0.16);
+  color: var(--accent);
+  border-color: rgba(12, 124, 136, 0.4);
+}
+
+.candle-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+.candle-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.candle-value {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.candle-countdown {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--accent-3);
 }
 
 .list {
@@ -364,3 +460,5 @@ canvas {
     height: 260px;
   }
 }
+
+
