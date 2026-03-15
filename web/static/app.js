@@ -1,5 +1,5 @@
-console.info("Orderflow UI v24 loaded");
-const UI_VERSION = "v24";
+console.info("Orderflow UI v25 loaded");
+const UI_VERSION = "v25";
 const DEFAULT_API_BASE = "https://binance-orderflow-bot-ms21.onrender.com";
 const CANDLE_FETCH_TIMEOUT_MS = 8000;
 
@@ -347,6 +347,7 @@ function drawFallbackCandles() {
 function initCandlesChart() {
   if (!els.candlesChart) return;
   if (!window.LightweightCharts) {
+    console.warn("LightweightCharts not available, using fallback.");
     ensureFallbackCanvas();
     candleSeries = {
       setData: (data) => {
@@ -663,11 +664,3 @@ pollState();
 connectStream();
 initExpanders();
 initCandlesView();
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((err) => {
-      console.warn("service worker registration failed", err);
-    });
-  });
-}
