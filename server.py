@@ -88,6 +88,7 @@ async def lifespan(app: FastAPI):
     timeout = aiohttp.ClientTimeout(total=20)
     connector = aiohttp.TCPConnector(limit=50, ssl=False)
     session = aiohttp.ClientSession(timeout=timeout, connector=connector)
+    app.state.http_session = session
     tasks = []
     try:
         await bot_app.initialize(session)
@@ -141,6 +142,23 @@ async def health() -> JSONResponse:
 async def state() -> JSONResponse:
     return JSONResponse(build_state_payload())
 
+
+@app.get("/api/candles")
+async def candles(
+    interval: str = "1m",
+    limit: int = 200,
+) -> JSONResponse:
+    interval = interval.lower()
+    limit = max(10, min(limit, 500))
+    session = app.state.http_session
+    data = await fetch_binance_candles(
+        session,
+        settings.rest_base_url,
+        settings.market_symbol,
+        interval,
+        limit,
+    )
+    return JSONResponse({"exchange": "BINANCE", "interval": interval, "candles": data})
 
 @app.get("/api/chart")
 async def chart() -> JSONResponse:
@@ -197,3 +215,10 @@ if __name__ == "__main__":
 
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+
+
+
+
+
+
+

@@ -11,7 +11,7 @@
     <link rel="icon" href="/static/icons/icon-32.png" sizes="32x32" />
     <link rel="icon" href="/static/icons/icon-16.png" sizes="16x16" />
     <link rel="apple-touch-icon" href="/static/icons/icon-180.png" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css" />\n    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <script defer src="/static/app.js"></script>
   </head>
   <body>
@@ -243,10 +243,6 @@
             <button class="icon-btn" type="button" id="chartFullscreen">Full Screen</button>
           </div>
           <div class="chart-toolbar">
-            <div class="exchange-tabs" id="exchangeTabs">
-              <button class="tab active" type="button" data-exchange="BINANCE">Binance</button>
-              <button class="tab" type="button" data-exchange="OKX">OKX</button>
-            </div>
             <div class="candle-tabs" id="candleTabs">
               <button class="tab active" type="button" data-tf="1m">1m</button>
               <button class="tab" type="button" data-tf="15m">15m</button>
@@ -261,11 +257,14 @@
             </div>
           </div>
           <div class="chart-wrap">
-            <div id="tvChart" class="tv-chart"></div>
+            <div id="candlesChart" class="candles-chart"></div>
           </div>
         </div>
       </section>
     </div>
   </body>
 </html>
+
+
+
 

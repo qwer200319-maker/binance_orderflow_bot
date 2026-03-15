@@ -1,4 +1,4 @@
-const CACHE_NAME = "orderflow-ui-v11";
+const CACHE_NAME = "orderflow-ui-v15";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -46,6 +46,10 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+
+
+
 
 
 
